@@ -1,0 +1,3 @@
+- Generate slugified patch names
+- Write a script to create a sandbox with upstream and patch repos and then to
+  apply run ply and assert the results.
