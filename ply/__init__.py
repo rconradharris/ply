@@ -1,6 +1,10 @@
+import re
 import os
 
 from ply import git
+
+
+RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
 
 
 class Repo(object):
@@ -9,7 +13,7 @@ class Repo(object):
 
     @property
     def path(self):
-        return self.git_repo.path
+        return os.path.abspath(self.git_repo.path)
 
 
 class WorkingRepo(Repo):
@@ -37,6 +41,50 @@ class WorkingRepo(Repo):
             patch_paths.append(new_path)
 
         return patch_paths
+
+    def applied_patches(self):
+        """Return a list of patches that have already been applied to this
+        branch.
+        """
+        applied = []
+        skip = 0
+        while True:
+            commit_msg = ply.working_repo.git_repo.log(
+                    count=1, pretty='%B', skip=skip)
+            matches = re.search(RE_PATCH_IDENTIFIER, commit_msg)
+            if not matches:
+                break
+
+            patch_name = matches.group(1)
+            applied.append(patch_name)
+            skip += 1
+
+        return applied
+
+    def apply_patches(self, base_path, patch_names, three_way_merge=True):
+        """Applies a series of patches to the working repo's current branch.
+
+        Each patch applied creates a commit in the working repo.
+
+        The commit contains a patch identification line which allows us to tie
+        it back to a specific patch in the series file. This is used when
+        resovling conflicts because it allows us to skip patches that have
+        already been applied.
+        """
+        applied = self.applied_patches()
+
+        for patch_name in patch_names:
+            if patch_name in applied:
+                continue
+
+            patch_path = os.path.join(base_path, patch_name)
+            self.git_repo.am(patch_path, three_way_merge=three_way_merge)
+
+            # Add patch identifier line to commit msg
+            commit_msg = ply.working_repo.git_repo.log(
+                    count=1, pretty='%B')
+            commit_msg += '\n\nPly-Patch: %s' % patch_name
+            self.git_repo.commit(commit_msg, amend=True)
 
 
 class PatchRepo(Repo):
@@ -69,6 +117,12 @@ class PatchRepo(Repo):
         # commit msg.
         self.git_repo.commit('Adding patches', quiet=quiet)
 
+    def get_patch_names(self):
+        with open(os.path.join(self.path, 'series'), 'r') as f:
+            for line in f:
+                patch_name = line.strip()
+                yield patch_name
+
 
 class Ply(object):
     def __init__(self):
@@ -86,7 +140,17 @@ class Ply(object):
         patch_paths = self.working_repo.format_patches(since)
         self.patch_repo.add_patches(patch_paths, quiet=quiet)
 
+    def restore(self, three_way_merge=True):
+        patch_names = self.patch_repo.get_patch_names()
+        self.working_repo.apply_patches(self.patch_repo.path, patch_names)
+
+    def applied_patches(self):
+        return self.working_repo.applied_patches()
+
 
 if __name__ == "__main__":
     ply = Ply()
-    ply.save('HEAD^1', quiet=True)
+    ply.save('HEAD^1', quiet=False)
+    ply.working_repo.git_repo.reset('HEAD^1', hard=True)
+    ply.restore()
+    print ply.applied_patches()

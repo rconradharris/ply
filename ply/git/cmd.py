@@ -86,16 +86,19 @@ def init(directory, quiet=False):
     subprocess.check_call(args)
 
 
-def log(count=None, pretty=None):
-    args = ['git', 'log', '--pretty=oneline']
+def log(count=None, pretty=None, skip=None):
+    args = ['git', 'log']
     if pretty:
         args.append("--pretty=%s" % pretty)
     if count is not None:
         args.append("-%d" % count)
+    if skip is not None:
+        args.append("--skip=%d" % skip)
     proc = subprocess.Popen(args, stdout=subprocess.PIPE)
     stdout, stderr = proc.communicate()
-    lines = [line.strip() for line in stdout.split('\n') if line]
-    return lines
+    if proc.returncode != 0:
+        raise exc.GitException((proc.returncode, stdout, stderr))
+    return stdout
 
 
 def reset(commit, hard=False, quiet=False):
