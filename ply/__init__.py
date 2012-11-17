@@ -1,7 +1,7 @@
 import re
 import os
 
-from ply import git
+from ply import exc, git
 
 
 RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
@@ -49,8 +49,7 @@ class WorkingRepo(Repo):
         applied = []
         skip = 0
         while True:
-            commit_msg = ply.working_repo.git_repo.log(
-                    count=1, pretty='%B', skip=skip)
+            commit_msg = self.git_repo.log(count=1, pretty='%B', skip=skip)
             matches = re.search(RE_PATCH_IDENTIFIER, commit_msg)
             if not matches:
                 break
@@ -81,8 +80,7 @@ class WorkingRepo(Repo):
             self.git_repo.am(patch_path, three_way_merge=three_way_merge)
 
             # Add patch identifier line to commit msg
-            commit_msg = ply.working_repo.git_repo.log(
-                    count=1, pretty='%B')
+            commit_msg = self.git_repo.log(count=1, pretty='%B')
             commit_msg += '\n\nPly-Patch: %s' % patch_name
             self.git_repo.commit(commit_msg, amend=True)
 
@@ -91,6 +89,63 @@ class WorkingRepo(Repo):
         num_applied = len(self.applied_patches())
         self.git_repo.reset('HEAD^%d' % num_applied, hard=True)
 
+    @property
+    def config_path(self):
+        return os.path.join(self.path, '.ply')
+
+    @property
+    def patch_repo_link_path(self):
+        return os.path.join(self.config_path, 'PATCH_REPO')
+
+    @property
+    def patch_repo_path(self):
+        with open(self.patch_repo_link_path) as f:
+            return f.read().strip()
+
+    @property
+    def patch_repo(self):
+        return PatchRepo(self.patch_repo_path)
+
+    def link_to_patch_repo(self, path, force=False):
+        """Link the working-repo to a local copy of the patch-repo."""
+        path = os.path.abspath(path)
+
+        if not os.path.exists(self.config_path):
+            os.mkdir(self.config_path)
+
+        if os.path.exists(self.patch_repo_link_path) and not force:
+            raise exc.AlreadyLinkedToPatchRepo
+
+        if not os.path.exists(path):
+            raise exc.PathNotFound
+
+        with open(self.patch_repo_link_path, 'w') as f:
+            f.write(path)
+
+    def restore(self, three_way_merge=True):
+        patch_names = self.patch_repo.get_patch_names()
+        self.apply_patches(self.patch_repo.path, patch_names)
+
+    def save(self, since, quiet=True):
+        """Saves a range of commits into the patch-repo.
+
+        1. Create the patches (using `git format-patch`)
+        2. Move the patches into the patch-repo (handling any dups)
+        3. Update the `series` file in the patch-repo
+        4. Commit the new patches
+        5. Rollback and reapply the patches. This is needed so that the
+           commits in the working-repo have the patch id annotation in the
+           commit msg which tells ply not to reapply the patch.
+        """
+        patch_paths = self.format_patches(since)
+        patch_names = self.patch_repo.add_patches(patch_paths, quiet=quiet)
+
+        # FIXME: rollingback and restoring is a bit of a hack. We just need to
+        # make sure the patch-id annotation gets into the commit msgs of the
+        # working-repo. It might be more efficient to do this somewhere else,
+        # but now it's good enough.
+        self.rollback()
+        self.restore()
 
 
 class PatchRepo(Repo):
@@ -154,49 +209,7 @@ class PatchRepo(Repo):
         self.git_repo.commit('Ply init')
 
 
-class Ply(object):
-    def __init__(self):
-        self.working_repo = WorkingRepo('sandbox/working-repo')
-        self.patch_repo = PatchRepo('sandbox/patch-repo')
-
-    def save(self, since, quiet=True):
-        """Saves a range of commits into the patch-repo.
-
-        1. Create the patches (using `git format-patch`)
-        2. Move the patches into the patch-repo (handling any dups)
-        3. Update the `series` file in the patch-repo
-        4. Commit the new patches
-        5. Rollback and reapply the patches. This is needed so that the
-           commits in the working-repo have the patch id annotation in the
-           commit msg which tells ply not to reapply the patch.
-        """
-        patch_paths = self.working_repo.format_patches(since)
-        patch_names = self.patch_repo.add_patches(patch_paths, quiet=quiet)
-
-        # FIXME: rollingback and restoring is a bit of a hack. We just need to
-        # make sure the patch-id annotation gets into the commit msgs of the
-        # working-repo. It might be more efficient to do this somewhere else,
-        # but now it's good enough.
-        self.working_repo.rollback()
-        self.restore()
-
-    def restore(self, three_way_merge=True):
-        patch_names = self.patch_repo.get_patch_names()
-        self.working_repo.apply_patches(self.patch_repo.path, patch_names)
-
-    def applied_patches(self):
-        return self.working_repo.applied_patches()
-
-    def init_patch_repo(self):
-        self.patch_repo.init()
-
-    def rollback(self):
-        self.working_repo.rollback()
-
-
 if __name__ == "__main__":
-    ply = Ply()
-    ply.save('HEAD^1', quiet=False)
-    #ply.working_repo.git_repo.reset('HEAD^1', hard=True)
-    #ply.restore()
-    print ply.applied_patches()
+    working_repo = WorkingRepo('sandbox/working-repo')
+    working_repo.save('HEAD^1', quiet=False)
+    print working_repo.applied_patches()
