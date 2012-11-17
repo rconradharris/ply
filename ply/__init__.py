@@ -89,10 +89,13 @@ class WorkingRepo(Repo):
 
 class PatchRepo(Repo):
     """Represents a git repo containing versioned patch files."""
+    @property
+    def series_path(self):
+        return os.path.join(self.path, 'series')
 
     def add_patches(self, patch_paths, quiet=True):
         """Adds and commits a set of patches into the patch repo."""
-        with open(os.path.join(self.path, 'series'), 'a') as f:
+        with open(self.series_path, 'a') as f:
             for orig_patch_path in patch_paths:
                 filename = os.path.basename(orig_patch_path)
 
@@ -118,10 +121,24 @@ class PatchRepo(Repo):
         self.git_repo.commit('Adding patches', quiet=quiet)
 
     def get_patch_names(self):
-        with open(os.path.join(self.path, 'series'), 'r') as f:
+        with open(self.series_path, 'r') as f:
             for line in f:
                 patch_name = line.strip()
                 yield patch_name
+
+    def init(self):
+        """Initialize the patch repo.
+
+        This performs a git init, adds the series file, and then commits it.
+        """
+        self.git_repo.init('.')
+
+        if not os.path.exists(self.series_path):
+            with open(self.series_path, 'w') as f:
+                pass
+
+        self.git_repo.add('series')
+        self.git_repo.commit('Ply init')
 
 
 class Ply(object):
@@ -146,6 +163,9 @@ class Ply(object):
 
     def applied_patches(self):
         return self.working_repo.applied_patches()
+
+    def init_patch_repo(self):
+        return self.patch_repo.init()
 
 
 if __name__ == "__main__":

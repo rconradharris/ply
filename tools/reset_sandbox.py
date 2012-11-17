@@ -1,6 +1,7 @@
 import os
 import shutil
 
+import ply
 from ply import git
 
 
@@ -46,11 +47,9 @@ def _create_git_repo(path):
 
 
 def _create_patch_repo(patch_repo_path):
-    patch_repo = _create_git_repo(patch_repo_path)
-    series_path = os.path.join(patch_repo_path, 'series')
-    with open(series_path, 'w') as f:
-        pass
-
+    _create_directory(patch_repo_path)
+    patch_repo = ply.PatchRepo(patch_repo_path)
+    patch_repo.init()
     return patch_repo
 
 
