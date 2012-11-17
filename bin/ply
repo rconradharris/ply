@@ -34,40 +34,58 @@ def do_link(*args):
         die("'%s' does not exist" % patch_repo_path)
 
 
-def do_patch(branch_name):
-    """Create a named patch branch."""
-    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
+def do_init(*args):
+    """Link a working repo to a patch repo."""
+    if not args:
+        die("ply init <patch-repo-path>")
+
+    patch_repo_path = args[0]
+
+    patch_repo = ply.PatchRepo(patch_repo_path)
+    patch_repo.init()
+
     try:
-        ply.create_patch_branch(patch_repo_path, branch_name)
-    except git.PatchDidNotApplyCleanly:
-        die("Patch did not apply cleanly:\n"
-            "\t1. Fix conflicts\n"
-            "\t2. git add any modified files\n"
-            "\t3. ply resolve\n")
+        working_repo.link_to_patch_repo(patch_repo_path, force=force)
+    except ply.exc.AlreadyLinkedToPatchRepo:
+        die("Already linked to '%s', use --force to overwrite."
+            % patch_repo_path)
+    except ply.exc.PathNotFound:
+        die("'%s' does not exist" % patch_repo_path)
 
-
-def do_resolve():
-    """Mark conflicts for a patch as resolved and continue applying the rest
-    of the patches.
-
-    Steps:
-
-        1. Fix the conflicting lines.
-        2. Add the files to the index.
-        3. Run ply resolve
-            a. This runs git am --resolve
-            b. Creates revised patch
-            c. Copies this revised patch over to patch repo.
-            d. Continues applying the rest of the patches
-    """
-    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
-    ply.resolve(cwd, patch_repo_path)
-
-
-def do_save():
-    """Save a new patch into the patch repo."""
-    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
-    ply.save(patch_repo_path)
+##def do_patch(branch_name):
+##    """Create a named patch branch."""
+##    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
+##    try:
+##        ply.create_patch_branch(patch_repo_path, branch_name)
+##    except git.PatchDidNotApplyCleanly:
+##        die("Patch did not apply cleanly:\n"
+##            "\t1. Fix conflicts\n"
+##            "\t2. git add any modified files\n"
+##            "\t3. ply resolve\n")
+##
+##
+##def do_resolve():
+##    """Mark conflicts for a patch as resolved and continue applying the rest
+##    of the patches.
+##
+##    Steps:
+##
+##        1. Fix the conflicting lines.
+##        2. Add the files to the index.
+##        3. Run ply resolve
+##            a. This runs git am --resolve
+##            b. Creates revised patch
+##            c. Copies this revised patch over to patch repo.
+##            d. Continues applying the rest of the patches
+##    """
+##    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
+##    ply.resolve(cwd, patch_repo_path)
+##
+##
+##def do_save():
+##    """Save a new patch into the patch repo."""
+##    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
+##    ply.save(patch_repo_path)
 
 
 def main():

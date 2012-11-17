@@ -199,7 +199,7 @@ class PatchRepo(Repo):
 
         This performs a git init, adds the series file, and then commits it.
         """
-        self.git_repo.init('.')
+        self.git_repo.init(self.path)
 
         if not os.path.exists(self.series_path):
             with open(self.series_path, 'w') as f:
