@@ -86,6 +86,12 @@ class WorkingRepo(Repo):
             commit_msg += '\n\nPly-Patch: %s' % patch_name
             self.git_repo.commit(commit_msg, amend=True)
 
+    def rollback(self):
+        """Rollback the entire patch-set making the branch match upstream."""
+        num_applied = len(self.applied_patches())
+        self.git_repo.reset('HEAD^%d' % num_applied, hard=True)
+
+
 
 class PatchRepo(Repo):
     """Represents a git repo containing versioned patch files."""
@@ -95,6 +101,7 @@ class PatchRepo(Repo):
 
     def add_patches(self, patch_paths, quiet=True):
         """Adds and commits a set of patches into the patch repo."""
+        patch_names = []
         with open(self.series_path, 'a') as f:
             for orig_patch_path in patch_paths:
                 filename = os.path.basename(orig_patch_path)
@@ -111,6 +118,11 @@ class PatchRepo(Repo):
                 os.rename(orig_patch_path, patch_path)
                 self.git_repo.add(filename)
                 f.write('%s\n' % filename)
+                # NOTE: if we support saving directly into subdirectories in
+                # the patch-repo, then the patch-name won't be the filename,
+                # but will be the relative-path + the filename, e.g.
+                # private/cells/database-modifications.patch.
+                patch_names.append(filename)
 
         self.git_repo.add('series')
 
@@ -119,6 +131,7 @@ class PatchRepo(Repo):
         # patches one first-line and filenames enumerated in the body of
         # commit msg.
         self.git_repo.commit('Adding patches', quiet=quiet)
+        return patch_names
 
     def get_patch_names(self):
         with open(self.series_path, 'r') as f:
@@ -153,9 +166,19 @@ class Ply(object):
         2. Move the patches into the patch-repo (handling any dups)
         3. Update the `series` file in the patch-repo
         4. Commit the new patches
+        5. Rollback and reapply the patches. This is needed so that the
+           commits in the working-repo have the patch id annotation in the
+           commit msg which tells ply not to reapply the patch.
         """
         patch_paths = self.working_repo.format_patches(since)
-        self.patch_repo.add_patches(patch_paths, quiet=quiet)
+        patch_names = self.patch_repo.add_patches(patch_paths, quiet=quiet)
+
+        # FIXME: rollingback and restoring is a bit of a hack. We just need to
+        # make sure the patch-id annotation gets into the commit msgs of the
+        # working-repo. It might be more efficient to do this somewhere else,
+        # but now it's good enough.
+        self.working_repo.rollback()
+        self.restore()
 
     def restore(self, three_way_merge=True):
         patch_names = self.patch_repo.get_patch_names()
@@ -165,12 +188,15 @@ class Ply(object):
         return self.working_repo.applied_patches()
 
     def init_patch_repo(self):
-        return self.patch_repo.init()
+        self.patch_repo.init()
+
+    def rollback(self):
+        self.working_repo.rollback()
 
 
 if __name__ == "__main__":
     ply = Ply()
     ply.save('HEAD^1', quiet=False)
-    ply.working_repo.git_repo.reset('HEAD^1', hard=True)
-    ply.restore()
+    #ply.working_repo.git_repo.reset('HEAD^1', hard=True)
+    #ply.restore()
     print ply.applied_patches()
