@@ -75,10 +75,17 @@ def do_init(*args):
 ##    ply.resolve(cwd, patch_repo_path)
 ##
 ##
-##def do_save():
-##    """Save a new patch into the patch repo."""
-##    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
-##    ply.save(patch_repo_path)
+
+def do_save(*args):
+    """Save a set of patches in the working-repo into the patch-repo.
+
+    If no argument is supplied, default to saving the last patch.
+    """
+    positional = [a for a in args if not a.startswith('-')]
+    since = positional[0] if positional else 'HEAD^1'
+    quiet = ('--quiet' in args) or ('-q' in args)
+    working_repo = ply.WorkingRepo('.')
+    working_repo.save(since, quiet=quiet)
 
 
 def main():
