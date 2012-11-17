@@ -205,8 +205,8 @@ class PatchRepo(Repo):
             with open(self.series_path, 'w') as f:
                 pass
 
-        self.git_repo.add('series')
-        self.git_repo.commit('Ply init')
+            self.git_repo.add('series')
+            self.git_repo.commit('Ply init')
 
 
 if __name__ == "__main__":

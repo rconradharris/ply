@@ -44,13 +44,6 @@ def do_init(*args):
     patch_repo = ply.PatchRepo(patch_repo_path)
     patch_repo.init()
 
-    try:
-        working_repo.link_to_patch_repo(patch_repo_path, force=force)
-    except ply.exc.AlreadyLinkedToPatchRepo:
-        die("Already linked to '%s', use --force to overwrite."
-            % patch_repo_path)
-    except ply.exc.PathNotFound:
-        die("'%s' does not exist" % patch_repo_path)
 
 ##def do_patch(branch_name):
 ##    """Create a named patch branch."""
