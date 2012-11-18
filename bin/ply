@@ -88,6 +88,21 @@ def do_save(*args):
     working_repo.save(since, quiet=quiet)
 
 
+
+def do_rollback():
+    """Rollback all patches."""
+    working_repo = ply.WorkingRepo('.')
+    working_repo.rollback()
+
+
+def do_restore():
+    """Apply the patch series to the the current branch of the
+    working-repo.
+    """
+    working_repo = ply.WorkingRepo('.')
+    working_repo.restore()
+
+
 def main():
     if len(sys.argv) < 2:
         usage()

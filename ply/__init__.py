@@ -86,8 +86,7 @@ class WorkingRepo(Repo):
 
     def rollback(self):
         """Rollback the entire patch-set making the branch match upstream."""
-        num_applied = len(self.applied_patches())
-        self.git_repo.reset('HEAD^%d' % num_applied, hard=True)
+        self.git_repo.reset('HEAD~%d' % len(self.applied_patches()), hard=True)
 
     @property
     def config_path(self):
@@ -140,11 +139,13 @@ class WorkingRepo(Repo):
         patch_paths = self.format_patches(since)
         patch_names = self.patch_repo.add_patches(patch_paths, quiet=quiet)
 
-        # FIXME: rollingback and restoring is a bit of a hack. We just need to
-        # make sure the patch-id annotation gets into the commit msgs of the
-        # working-repo. It might be more efficient to do this somewhere else,
-        # but now it's good enough.
-        self.rollback()
+        # We can't use `rollback` here b/c that depends on the patch id
+        # annotation being present, which we haven't created yet (aka chicken
+        # & egg problem)
+        #
+        # There might be a better (safer) way to do this...
+        self.git_repo.reset('HEAD~%d' % len(patch_names), hard=True)
+
         self.restore()
 
 
@@ -211,5 +212,5 @@ class PatchRepo(Repo):
 
 if __name__ == "__main__":
     working_repo = WorkingRepo('sandbox/working-repo')
-    working_repo.save('HEAD^1', quiet=False)
-    print working_repo.applied_patches()
+    working_repo.save('HEAD~1', quiet=False)
+    #print working_repo.applied_patches()
