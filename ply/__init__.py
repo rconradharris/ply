@@ -22,26 +22,6 @@ class WorkingRepo(Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    def format_patches(self, since):
-        """Create patch files since a given commmit."""
-        filenames = self.git_repo.format_patch(since)
-
-        if not filenames:
-            raise Exception('no patch files generated')
-
-        # Remove number prefix from patch filename since we use a `series`
-        # file (like quilt) to order the patches
-        patch_paths = []
-        for filename in filenames:
-            orig_path = os.path.join(self.path, filename)
-            new_filename = filename.split('-', 1)[1]
-            new_path = os.path.join(self.path, new_filename)
-            os.rename(orig_path, new_path)
-
-            patch_paths.append(new_path)
-
-        return patch_paths
-
     def applied_patches(self):
         """Return a list of patches that have already been applied to this
         branch.
@@ -64,11 +44,6 @@ class WorkingRepo(Repo):
         """Applies a series of patches to the working repo's current branch.
 
         Each patch applied creates a commit in the working repo.
-
-        The commit contains a patch identification line which allows us to tie
-        it back to a specific patch in the series file. This is used when
-        resovling conflicts because it allows us to skip patches that have
-        already been applied.
         """
         applied = self.applied_patches()
 
@@ -79,10 +54,6 @@ class WorkingRepo(Repo):
             patch_path = os.path.join(base_path, patch_name)
             self.git_repo.am(patch_path, three_way_merge=three_way_merge)
 
-            # Add patch identifier line to commit msg
-            commit_msg = self.git_repo.log(count=1, pretty='%B')
-            commit_msg += '\n\nPly-Patch: %s' % patch_name
-            self.git_repo.commit(commit_msg, amend=True)
 
     def rollback(self):
         """Rollback the entire patch-set making the branch match upstream."""
@@ -126,7 +97,7 @@ class WorkingRepo(Repo):
         self.apply_patches(self.patch_repo.path, patch_names)
 
     def save(self, since, quiet=True):
-        """Saves a range of commits into the patch-repo.
+        """Save last commit to working-repo as patch in the patch-repo.
 
         1. Create the patches (using `git format-patch`)
         2. Move the patches into the patch-repo (handling any dups)
@@ -136,16 +107,43 @@ class WorkingRepo(Repo):
            commits in the working-repo have the patch id annotation in the
            commit msg which tells ply not to reapply the patch.
         """
-        patch_paths = self.format_patches(since)
-        patch_names = self.patch_repo.add_patches(patch_paths, quiet=quiet)
+        commit_msg = self.git_repo.log(count=1, pretty='%B')
 
-        # We can't use `rollback` here b/c that depends on the patch id
-        # annotation being present, which we haven't created yet (aka chicken
-        # & egg problem)
-        #
-        # There might be a better (safer) way to do this...
-        self.git_repo.reset('HEAD~%d' % len(patch_names), hard=True)
+        # Generate patch_name (slugify then add .patch extension)
+        first_line = commit_msg.split('\n')[0]
+        first_line = first_line.replace(' ', '-')
+        patch_name = ''.join(
+                ch for ch in first_line if ch.isalnum() or ch == '-')
+        patch_name += '.patch'
 
+        # Add patch-name annotation to commit msg (if we're refreshing an
+        # existing patch, then the annotation will already be present)
+        new = False
+        if 'Ply-Patch' not in commit_msg:
+            new = True
+            commit_msg += '\n\nPly-Patch: %s' % patch_name
+            self.git_repo.commit(commit_msg, amend=True)
+
+        # Create patch file
+        filename = self.git_repo.format_patch('HEAD^')[0]
+        orig_path = os.path.join(self.path, filename)
+        new_path = os.path.join(self.path, patch_name)
+        os.rename(orig_path, new_path)
+
+        # Add to patch repo
+        self.patch_repo.add_patch(new_path, quiet=quiet, new=new)
+
+    def resolve(self):
+        """Resolves a commit and refreshes the affected patch in the
+        patch-repo.
+        """
+        # 1. Mark resolved
+        self.git_repo.am(resolved=True)
+
+        # 2. Refresh the patch by saving the new version to the patch-repo
+        self.save('HEAD^')
+
+        # 3. Apply remaining patches
         self.restore()
 
 
@@ -155,39 +153,27 @@ class PatchRepo(Repo):
     def series_path(self):
         return os.path.join(self.path, 'series')
 
-    def add_patches(self, patch_paths, quiet=True):
+    def add_patch(self, orig_patch_path, quiet=True, new=True):
         """Adds and commits a set of patches into the patch repo."""
-        patch_names = []
-        with open(self.series_path, 'a') as f:
-            for orig_patch_path in patch_paths:
-                filename = os.path.basename(orig_patch_path)
+        # NOTE: if we support saving directly into subdirectories in
+        # the patch-repo, then the patch-name won't be the filename,
+        # but will be the relative-path + the filename, e.g.
+        # private/cells/database-modifications.patch.
+        filename = os.path.basename(orig_patch_path)
+        patch_path = os.path.join(self.path, filename)
+        os.rename(orig_patch_path, patch_path)
+        self.git_repo.add(filename)
 
-                patch_path = os.path.join(self.path, filename)
-                if os.path.exists(patch_path):
-                    name, ext = patch_path.rsplit('.', 1)
-                    for dedup in xrange(999):
-                        filename = "%s-%d.%s" % (name, dedup + 1, ext)
-                        patch_path = os.path.join(self.path, filename)
-                        if not os.path.exists(patch_path):
-                            break
-
-                os.rename(orig_patch_path, patch_path)
-                self.git_repo.add(filename)
+        if new:
+            with open(self.series_path, 'a') as f:
                 f.write('%s\n' % filename)
-                # NOTE: if we support saving directly into subdirectories in
-                # the patch-repo, then the patch-name won't be the filename,
-                # but will be the relative-path + the filename, e.g.
-                # private/cells/database-modifications.patch.
-                patch_names.append(filename)
-
-        self.git_repo.add('series')
+            self.git_repo.add('series')
 
         # TODO: improve this commit msg, for 1 or 2 patches use short form of
         # just comma separated, for more than that, use long-form of number of
         # patches one first-line and filenames enumerated in the body of
         # commit msg.
         self.git_repo.commit('Adding patches', quiet=quiet)
-        return patch_names
 
     def get_patch_names(self):
         with open(self.series_path, 'r') as f:

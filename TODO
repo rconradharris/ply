@@ -1,2 +1,4 @@
 - Write a script to create a sandbox with upstream and patch repos and then to
   apply run ply and assert the results.
+- Make do_save catch did not apply cleanly, and print helpful message
+- Improve commit msg on add_patch

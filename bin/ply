@@ -45,36 +45,23 @@ def do_init(*args):
     patch_repo.init()
 
 
-##def do_patch(branch_name):
-##    """Create a named patch branch."""
-##    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
-##    try:
-##        ply.create_patch_branch(patch_repo_path, branch_name)
-##    except git.PatchDidNotApplyCleanly:
-##        die("Patch did not apply cleanly:\n"
-##            "\t1. Fix conflicts\n"
-##            "\t2. git add any modified files\n"
-##            "\t3. ply resolve\n")
-##
-##
-##def do_resolve():
-##    """Mark conflicts for a patch as resolved and continue applying the rest
-##    of the patches.
-##
-##    Steps:
-##
-##        1. Fix the conflicting lines.
-##        2. Add the files to the index.
-##        3. Run ply resolve
-##            a. This runs git am --resolve
-##            b. Creates revised patch
-##            c. Copies this revised patch over to patch repo.
-##            d. Continues applying the rest of the patches
-##    """
-##    patch_repo_path = ply.get_patch_repo_path(os.getcwd())
-##    ply.resolve(cwd, patch_repo_path)
-##
-##
+def do_resolve():
+    """Mark conflicts for a patch as resolved and continue applying the rest
+    of the patches.
+
+    Steps:
+
+        1. Fix the conflicting lines.
+        2. Add the files to the index.
+        3. Run ply resolve
+            a. This runs git am --resolve
+            b. Creates revised patch
+            c. Copies this revised patch over to patch repo.
+            d. Continues applying the rest of the patches
+    """
+    working_repo = ply.WorkingRepo('.')
+    working_repo.resolve()
+
 
 def do_save(*args):
     """Save a set of patches in the working-repo into the patch-repo.
