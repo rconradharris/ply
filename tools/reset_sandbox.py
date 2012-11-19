@@ -55,7 +55,8 @@ def main():
     _create_directory(SANDBOX)
     patch_repo = _create_patch_repo(os.path.join(SANDBOX, 'patch-repo'))
     working_repo = _create_working_repo(os.path.join(SANDBOX, 'working-repo'),
-            patch_repo)
+                                        patch_repo)
+    working_repo.save()
 
 
 if __name__ == '__main__':

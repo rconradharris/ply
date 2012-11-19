@@ -35,7 +35,7 @@ class WorkingRepo(Repo):
         patch_name = matches.group(1)
         return patch_name
 
-    def _add_patch_annotation(self, commit_msg):
+    def _add_patch_annotation(self, commit_msg, quiet=True):
         """Add a patch annotation to the last commit."""
         # TODO: add dedup'ing in case patch-file of same name already exists
         # in the patch-repo
@@ -46,7 +46,7 @@ class WorkingRepo(Repo):
         patch_name += '.patch'
 
         commit_msg += '\n\nPly-Patch: %s' % patch_name
-        self.git_repo.commit(commit_msg, amend=True)
+        self.git_repo.commit(commit_msg, amend=True, quiet=quiet)
         return patch_name
 
     def applied_patches(self):
@@ -141,7 +141,7 @@ class WorkingRepo(Repo):
         patch_name = self._get_patch_annotation(commit_msg)
 
         if not patch_name:
-            patch_name = self._add_patch_annotation(commit_msg)
+            patch_name = self._add_patch_annotation(commit_msg, quiet=quiet)
 
         # Create patch file
         filename = self.git_repo.format_patch('HEAD^')[0]
@@ -193,22 +193,16 @@ class PatchRepo(Repo):
                 patch_name = line.strip()
                 yield patch_name
 
-    def init(self):
+    def init(self, quiet=True):
         """Initialize the patch repo.
 
         This performs a git init, adds the series file, and then commits it.
         """
-        self.git_repo.init(self.path)
+        self.git_repo.init(self.path, quiet=quiet)
 
         if not os.path.exists(self.series_path):
             with open(self.series_path, 'w') as f:
                 pass
 
             self.git_repo.add('series')
-            self.git_repo.commit('Ply init')
-
-
-if __name__ == "__main__":
-    working_repo = WorkingRepo('sandbox/working-repo')
-    working_repo.save()
-    #print working_repo.applied_patches()
+            self.git_repo.commit('Ply init', quiet=quiet)

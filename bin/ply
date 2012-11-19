@@ -81,7 +81,16 @@ def do_restore():
     working-repo.
     """
     working_repo = ply.WorkingRepo('.')
-    working_repo.restore()
+    try:
+        working_repo.restore()
+    except ply.git.exc.PatchDidNotApplyCleanly:
+        print "Patch did not apply cleanly. To fix:"
+        print
+        print "\t1) Fix conflicts in affected files"
+        print "\n\t2) `git add` affected files"
+        print "\n\t3) Run `ply resolve` to refresh the patch and"\
+              " apply the rest\n\t   of the patches in the series."
+        sys.exit(1)
 
 
 def main():
