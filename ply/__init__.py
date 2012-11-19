@@ -13,25 +13,6 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    @property
-    def patch_repo(self):
-        """Return a patch repo object associated with this working repo via
-        the `.PATCH_REPO` symlink.
-        """
-        return PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
-
-    @staticmethod
-    def _get_patch_annotation(commit_msg):
-        """Return the Ply-Patch annotation if present in the commit msg.
-
-        Returns None if not present.
-        """
-        matches = re.search(RE_PATCH_IDENTIFIER, commit_msg)
-        if not matches:
-            return None
-
-        return matches.group(1)
-
     def _add_patch_annotation(self, commit_msg, quiet=True):
         """Add a patch annotation to the last commit."""
         # TODO: add dedup'ing in case patch-file of same name already exists
@@ -66,6 +47,38 @@ class WorkingRepo(git.Repo):
             skip += 1
 
         return applied
+
+    @staticmethod
+    def _get_patch_annotation(commit_msg):
+        """Return the Ply-Patch annotation if present in the commit msg.
+
+        Returns None if not present.
+        """
+        matches = re.search(RE_PATCH_IDENTIFIER, commit_msg)
+        if not matches:
+            return None
+
+        return matches.group(1)
+
+    @property
+    def patch_repo(self):
+        """Return a patch repo object associated with this working repo via
+        the `.PATCH_REPO` symlink.
+        """
+        return PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
+
+    def resolve(self):
+        """Resolves a commit and refreshes the affected patch in the
+        patch-repo.
+        """
+        # 1. Mark resolved
+        self.am(resolved=True)
+
+        # 2. Refresh the patch by saving the new version to the patch-repo
+        self.save()
+
+        # 3. Apply remaining patches
+        self.restore()
 
     def restore(self, three_way_merge=True):
         """Applies a series of patches to the working repo's current branch.
@@ -105,25 +118,9 @@ class WorkingRepo(git.Repo):
         # Add to patch repo
         self.patch_repo.add_patch(patch_name, patch_path, quiet=quiet)
 
-    def resolve(self):
-        """Resolves a commit and refreshes the affected patch in the
-        patch-repo.
-        """
-        # 1. Mark resolved
-        self.am(resolved=True)
-
-        # 2. Refresh the patch by saving the new version to the patch-repo
-        self.save()
-
-        # 3. Apply remaining patches
-        self.restore()
-
 
 class PatchRepo(git.Repo):
     """Represents a git repo containing versioned patch files."""
-    @property
-    def series_path(self):
-        return os.path.join(self.path, 'series')
 
     def add_patch(self, patch_name, patch_path, quiet=True):
         """Adds and commits a set of patches into the patch repo."""
@@ -142,13 +139,6 @@ class PatchRepo(git.Repo):
         # commit msg.
         self.commit('Adding patches', quiet=quiet)
 
-    @property
-    def series(self):
-        with open(self.series_path, 'r') as f:
-            for line in f:
-                patch_name = line.strip()
-                yield patch_name
-
     def initialize(self, quiet=True):
         """Initialize the patch repo.
 
@@ -162,3 +152,14 @@ class PatchRepo(git.Repo):
 
             self.add('series')
             self.commit('Ply init', quiet=quiet)
+
+    @property
+    def series_path(self):
+        return os.path.join(self.path, 'series')
+
+    @property
+    def series(self):
+        with open(self.series_path, 'r') as f:
+            for line in f:
+                patch_name = line.strip()
+                yield patch_name
