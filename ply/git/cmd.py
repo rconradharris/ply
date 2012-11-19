@@ -118,7 +118,7 @@ class Repo(object):
     """
 
     def __init__(self, path):
-        self.path = path
+        self.path = os.path.abspath(path)
         for fname in __cmds__:
             fn = globals()[fname]
             decorated_fn = self._with_temporary_chdir(fn)

@@ -15,25 +15,6 @@ def usage():
     die("usage: ply <cmd>")
 
 
-def do_link(*args):
-    """Link a working repo to a patch repo."""
-    if not args:
-        die("ply link [-f] <patch-repo-path>")
-
-    patch_repo_path = args[0]
-    force = ('--force' in args) or ('-f' in args)
-
-    working_repo = ply.WorkingRepo('.')
-
-    try:
-        working_repo.link_to_patch_repo(patch_repo_path, force=force)
-    except ply.exc.AlreadyLinkedToPatchRepo:
-        die("Already linked to '%s', use --force to overwrite."
-            % patch_repo_path)
-    except ply.exc.PathNotFound:
-        die("'%s' does not exist" % patch_repo_path)
-
-
 def do_init(*args):
     """Link a working repo to a patch repo."""
     if not args:
@@ -42,7 +23,7 @@ def do_init(*args):
     patch_repo_path = args[0]
 
     patch_repo = ply.PatchRepo(patch_repo_path)
-    patch_repo.init()
+    patch_repo.initialize()
 
 
 def do_resolve():

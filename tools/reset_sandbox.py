@@ -11,17 +11,17 @@ SANDBOX = 'sandbox'
 def _create_patch_repo(patch_repo_path):
     _create_directory(patch_repo_path)
     patch_repo = ply.PatchRepo(patch_repo_path)
-    patch_repo.init()
+    patch_repo.initialize()
     return patch_repo
 
 
 def _create_working_repo(working_repo_path, patch_repo):
     _create_directory(working_repo_path)
     working_repo = ply.WorkingRepo(working_repo_path)
-    working_repo.git_repo.init('.', quiet=True)
+    working_repo.init('.', quiet=True)
 
     # Link to patch repo
-    working_repo.link_to_patch_repo(patch_repo.path)
+    os.symlink(patch_repo.path, working_repo.patch_repo_path)
 
     # Create Typo
     readme_path = os.path.join(working_repo_path, 'README')
@@ -31,15 +31,15 @@ def _create_working_repo(working_repo_path, patch_repo):
     with open(readme_path, 'w') as f:
         f.write(typo_txt)
 
-    working_repo.git_repo.add('README')
-    working_repo.git_repo.commit('Adding README', quiet=True)
+    working_repo.add('README')
+    working_repo.commit('Adding README', quiet=True)
 
     # Fix Typo
     with open(readme_path, 'w') as f:
         f.write(typo_txt.replace('there', 'their'))
 
-    working_repo.git_repo.add('README')
-    working_repo.git_repo.commit('Typofix', quiet=True)
+    working_repo.add('README')
+    working_repo.commit('Typofix', quiet=True)
 
     return working_repo
 
