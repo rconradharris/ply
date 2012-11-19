@@ -12,7 +12,9 @@ def die(msg):
 
 
 def usage():
-    die("usage: ply <cmd>")
+    cmds = [x.replace('do_', '')
+            for x in globals().keys() if x.startswith('do_')]
+    die("usage: ply <%s>" % '|'.join(sorted(cmds)))
 
 
 def do_init(_, *args):
@@ -21,16 +23,16 @@ def do_init(_, *args):
         die("ply init <patch-repo-path>")
 
     patch_repo_path = args[0]
-
     patch_repo = ply.PatchRepo(patch_repo_path)
     patch_repo.initialize()
 
 
-def do_resolve(working_repo):
+def do_resolve(working_repo, *args):
     """Mark conflicts for a patch as resolved and continue applying the rest
     of the patches in the series.
     """
-    working_repo.resolve()
+    quiet = '-v' not in args
+    working_repo.resolve(quiet=quiet)
 
 
 def do_restore(working_repo):
@@ -50,7 +52,7 @@ def do_restore(working_repo):
 
 def do_save(working_repo, *args):
     """Saves last commit as a new patch in the patch-repo."""
-    quiet = ('--quiet' in args) or ('-q' in args)
+    quiet = '-v' not in args
     working_repo.save(quiet=quiet)
 
 

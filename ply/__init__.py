@@ -48,6 +48,16 @@ class WorkingRepo(git.Repo):
 
         return applied
 
+    def _create_patch(self, patch_name):
+        """Create a patch, move it into the patch-repo and add it to the
+        series file if necessary.
+        """
+        filename = self.format_patch('HEAD^')[0]
+        os.rename(os.path.join(self.path, filename),
+                  os.path.join(self.patch_repo.path, patch_name))
+        self.patch_repo.add(patch_name)
+        self.patch_repo.add_patch_to_series(patch_name)
+
     @staticmethod
     def _get_patch_annotation(commit_msg):
         """Return the Ply-Patch annotation if present in the commit msg.
@@ -60,6 +70,15 @@ class WorkingRepo(git.Repo):
 
         return matches.group(1)
 
+    def _refresh_patch_for_last_commit(self, quiet=True):
+        """Refresh the patch in the patch-repo that corresponds to the last
+        commit in the working-repo.
+        """
+        commit_msg = self.log(count=1, pretty='%B')
+        patch_name = self._get_patch_annotation(commit_msg)
+        self._create_patch(patch_name)
+        self.patch_repo.commit('Refreshing %s' % patch_name, quiet=quiet)
+
     @property
     def patch_repo(self):
         """Return a patch repo object associated with this working repo via
@@ -67,18 +86,13 @@ class WorkingRepo(git.Repo):
         """
         return PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
 
-    def resolve(self):
+    def resolve(self, quiet=True):
         """Resolves a commit and refreshes the affected patch in the
         patch-repo.
         """
-        # 1. Mark resolved
         self.am(resolved=True)
-
-        # 2. Refresh the patch by saving the new version to the patch-repo
-        self.save()
-
-        # 3. Apply remaining patches
-        self.restore()
+        self._refresh_patch_for_last_commit(quiet=quiet)
+        self.restore()  # Apply remaining patches
 
     def restore(self, three_way_merge=True):
         """Applies a series of patches to the working repo's current branch.
@@ -95,55 +109,23 @@ class WorkingRepo(git.Repo):
             self.am(patch_path, three_way_merge=three_way_merge)
 
     def save(self, quiet=True):
-        """Save last commit to working-repo as patch in the patch-repo.
-
-        1. Create the patches (using `git format-patch`)
-        2. Move the patches into the patch-repo (handling any dups)
-        3. Update the `series` file in the patch-repo
-        4. Commit the new patches
-        5. Rollback and reapply the patches. This is needed so that the
-           commits in the working-repo have the patch id annotation in the
-           commit msg which tells ply not to reapply the patch.
-        """
+        """Save last commit to working-repo as patch in the patch-repo."""
         commit_msg = self.log(count=1, pretty='%B')
-        patch_name = self._get_patch_annotation(commit_msg)
-
-        if not patch_name:
-            patch_name = self._add_patch_annotation(commit_msg, quiet=quiet)
-
-        # Create patch file
-        filename = self.format_patch('HEAD^')[0]
-        patch_path = os.path.join(self.path, filename)
-
-        # Add to patch repo
-        self.patch_repo.add_patch(patch_name, patch_path, quiet=quiet)
+        patch_name = self._add_patch_annotation(commit_msg, quiet=quiet)
+        self._create_patch(patch_name)
+        self.patch_repo.commit('Adding %s' % patch_name, quiet=quiet)
 
 
 class PatchRepo(git.Repo):
     """Represents a git repo containing versioned patch files."""
-
-    def add_patch(self, patch_name, patch_path, quiet=True):
-        """Adds and commits a set of patches into the patch repo."""
-        os.rename(patch_path, os.path.join(self.path, patch_name))
-        self.add(patch_name)
-
-        # Add to series file, if this is a new patch
+    def add_patch_to_series(self, patch_name):
         if patch_name not in self.series:
             with open(self.series_path, 'a') as f:
                 f.write('%s\n' % patch_name)
             self.add('series')
 
-        # TODO: improve this commit msg, for 1 or 2 patches use short form of
-        # just comma separated, for more than that, use long-form of number of
-        # patches one first-line and filenames enumerated in the body of
-        # commit msg.
-        self.commit('Adding patches', quiet=quiet)
-
     def initialize(self, quiet=True):
-        """Initialize the patch repo.
-
-        This performs a git init, adds the series file, and then commits it.
-        """
+        """Initialize the patch repo (create series file and git-init)."""
         self.init(self.path, quiet=quiet)
 
         if not os.path.exists(self.series_path):
