@@ -21,7 +21,7 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.init('.', quiet=True)
 
     # Link to patch repo
-    os.symlink(patch_repo.path, working_repo.patch_repo_path)
+    os.symlink(patch_repo.path, os.path.join(working_repo.path, '.PATCH_REPO'))
 
     # Create Typo
     readme_path = os.path.join(working_repo_path, 'README')

@@ -13,6 +13,10 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
+    def __init__(self, path):
+        super(WorkingRepo, self).__init__(path)
+        self.patch_repo = PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
+
     @staticmethod
     def _get_patch_annotation(commit_msg):
         """Return the Ply-Patch annotation if present in the commit msg.
@@ -39,7 +43,7 @@ class WorkingRepo(git.Repo):
         self.commit(commit_msg, amend=True, quiet=quiet)
         return patch_name
 
-    def applied_patches(self):
+    def _applied_patches(self):
         """Return a list of patches that have already been applied to this
         branch.
 
@@ -60,29 +64,18 @@ class WorkingRepo(git.Repo):
 
         return applied
 
-    def rollback(self):
-        """Rollback the entire patch-set making the branch match upstream."""
-        self.reset('HEAD~%d' % len(self.applied_patches()), hard=True)
-
-    @property
-    def patch_repo_path(self):
-        return os.path.join(self.path, '.PATCH_REPO')
-
-    @property
-    def patch_repo(self):
-        return PatchRepo(self.patch_repo_path)
-
     def restore(self, three_way_merge=True):
         """Applies a series of patches to the working repo's current branch.
 
         Each patch applied creates a commit in the working repo.
         """
-        applied = self.applied_patches()
-        for patch_name in self.patch_repo.get_patch_names():
+        applied = self._applied_patches()
+
+        for patch_name in self.patch_repo.series:
             if patch_name in applied:
                 continue
 
-            patch_path = os.path.join(base_path, patch_name)
+            patch_path = os.path.join(self.patch_repo.path, patch_name)
             self.am(patch_path, three_way_merge=three_way_merge)
 
     def save(self, quiet=True):
@@ -135,7 +128,7 @@ class PatchRepo(git.Repo):
         self.add(patch_name)
 
         # Add to series file, if this is a new patch
-        if patch_name not in self.get_patch_names():
+        if patch_name not in self.series:
             with open(self.series_path, 'a') as f:
                 f.write('%s\n' % patch_name)
             self.add('series')
@@ -146,7 +139,8 @@ class PatchRepo(git.Repo):
         # commit msg.
         self.commit('Adding patches', quiet=quiet)
 
-    def get_patch_names(self):
+    @property
+    def series(self):
         with open(self.series_path, 'r') as f:
             for line in f:
                 patch_name = line.strip()

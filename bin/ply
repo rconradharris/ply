@@ -15,7 +15,7 @@ def usage():
     die("usage: ply <cmd>")
 
 
-def do_init(*args):
+def do_init(_, *args):
     """Link a working repo to a patch repo."""
     if not args:
         die("ply init <patch-repo-path>")
@@ -26,42 +26,16 @@ def do_init(*args):
     patch_repo.initialize()
 
 
-def do_resolve():
+def do_resolve(working_repo):
     """Mark conflicts for a patch as resolved and continue applying the rest
-    of the patches.
-
-    Steps:
-
-        1. Fix the conflicting lines.
-        2. Add the files to the index.
-        3. Run ply resolve
-            a. This runs git am --resolve
-            b. Creates revised patch
-            c. Copies this revised patch over to patch repo.
-            d. Continues applying the rest of the patches
+    of the patches in the series.
     """
-    working_repo = ply.WorkingRepo('.')
     working_repo.resolve()
 
 
-def do_save(*args):
-    """Saves last commit as a new patch in the patch-repo."""
-    quiet = ('--quiet' in args) or ('-q' in args)
-    working_repo = ply.WorkingRepo('.')
-    working_repo.save(quiet=quiet)
-
-
-def do_rollback():
-    """Rollback all patches."""
-    working_repo = ply.WorkingRepo('.')
-    working_repo.rollback()
-
-
-def do_restore():
-    """Apply the patch series to the the current branch of the
-    working-repo.
+def do_restore(working_repo):
+    """Apply the patch series to the the current branch of the working-repo.
     """
-    working_repo = ply.WorkingRepo('.')
     try:
         working_repo.restore()
     except ply.git.exc.PatchDidNotApplyCleanly:
@@ -74,6 +48,12 @@ def do_restore():
         sys.exit(1)
 
 
+def do_save(working_repo, *args):
+    """Saves last commit as a new patch in the patch-repo."""
+    quiet = ('--quiet' in args) or ('-q' in args)
+    working_repo.save(quiet=quiet)
+
+
 def main():
     if len(sys.argv) < 2:
         usage()
@@ -81,7 +61,8 @@ def main():
     cmd = sys.argv[1]
     func = globals().get('do_%s' % cmd)
     if func:
-        func(*sys.argv[2:])
+        working_repo = ply.WorkingRepo('.')
+        func(working_repo, *sys.argv[2:])
     else:
         die("command '%s' not found" % cmd)
 
