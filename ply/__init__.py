@@ -13,9 +13,12 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    def __init__(self, path):
-        super(WorkingRepo, self).__init__(path)
-        self.patch_repo = PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
+    @property
+    def patch_repo(self):
+        """Return a patch repo object associated with this working repo via
+        the `.PATCH_REPO` symlink.
+        """
+        return PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
 
     @staticmethod
     def _get_patch_annotation(commit_msg):
