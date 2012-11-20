@@ -85,11 +85,10 @@ class WorkingRepo(git.Repo):
         commit_msg = self.log(count=1, pretty='%B')
         patch_name = self._get_patch_annotation(commit_msg)
         self._create_patch(patch_name)
-        self._commit_to_patch_repo('Refreshing %s' % patch_name, quiet=quiet)
 
     def _commit_to_patch_repo(self, commit_msg, quiet=True):
         us_hash = self._last_upstream_commit_hash()
-        commit_msg += '\n\nPly-Patch-Based-On: %s' % us_hash
+        commit_msg += '\n\nPly-Based-On: %s' % us_hash
         self.patch_repo.commit(commit_msg, quiet=quiet)
 
     @property
@@ -102,10 +101,21 @@ class WorkingRepo(git.Repo):
     def resolve(self, quiet=True):
         """Resolves a commit and refreshes the affected patch in the
         patch-repo.
+
+        Rather than generate a new commit in the patch-repo for each refreshed
+        patch, which would make for a rather chatty history, we instead commit
+        one time after all of the patches have been applied.
         """
         self.am(resolved=True)
         self._refresh_patch_for_last_commit(quiet=quiet)
-        self.restore()  # Apply remaining patches
+        try:
+            self.restore()  # Apply remaining patches
+        except git.exc.PatchDidNotApplyCleanly:
+            raise
+        else:
+            # Only commit once all of the patches have been applied cleanly
+            self._commit_to_patch_repo(
+                    'Refreshing patches', quiet=quiet)
 
     def restore(self, three_way_merge=True):
         """Applies a series of patches to the working repo's current branch.

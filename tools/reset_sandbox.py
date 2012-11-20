@@ -40,6 +40,15 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.add('README')
     working_repo.commit('Typofix', quiet=True)
+    working_repo.save()
+
+    # Add exclamation point
+    with open(readme_path, 'w') as f:
+        f.write(typo_txt.replace('.', '!'))
+
+    working_repo.add('README')
+    working_repo.commit('Adding exclamation point.', quiet=True)
+    working_repo.save()
 
     return working_repo
 
@@ -56,7 +65,6 @@ def main():
     patch_repo = _create_patch_repo(os.path.join(SANDBOX, 'patch-repo'))
     working_repo = _create_working_repo(os.path.join(SANDBOX, 'working-repo'),
                                         patch_repo)
-    working_repo.save()
 
 
 if __name__ == '__main__':
