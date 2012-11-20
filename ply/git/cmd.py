@@ -90,7 +90,7 @@ def init(directory, quiet=False):
     subprocess.check_call(args)
 
 
-def log(count=None, pretty=None, skip=None):
+def log(cmd_arg=None, count=None, pretty=None, skip=None):
     args = ['git', 'log']
     if pretty:
         args.append("--pretty=%s" % pretty)
@@ -98,6 +98,8 @@ def log(count=None, pretty=None, skip=None):
         args.append("-%d" % count)
     if skip is not None:
         args.append("--skip=%d" % skip)
+    if cmd_arg:
+        args.append(cmd_arg)
     proc = subprocess.Popen(args, stdout=subprocess.PIPE)
     stdout, stderr = proc.communicate()
     if proc.returncode != 0:

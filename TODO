@@ -1,3 +1,5 @@
+- Add a way to abort a restore, --abort
+- Make resolved just be restore --resolved similar to rebase and am
 - Make .PATCH_REPO, into .patch-repo
 - Add check to make sure working-repo has changes before saving to patch repo
 - Write a script to create a sandbox with upstream and patch repos and then to

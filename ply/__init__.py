@@ -1,10 +1,6 @@
-import re
 import os
 
-from ply import exc, git
-
-
-RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
+from ply import exc, git, utils
 
 
 class WorkingRepo(git.Repo):
@@ -13,19 +9,17 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    def _make_patch_name(self, prefix=None):
+    def _make_patch_name(self, subject, prefix=None):
         """The patch name is a slugified version of the commit msg's first
         line.
 
         Prefix is an optional subdirectory in the patch-repo where we would
         like to drop our new patch.
         """
-        commit_msg = self.log(count=1, pretty='%B')
         # TODO: add dedup'ing in case patch-file of same name already exists
         # in the patch-repo
-        first_line = commit_msg.split('\n')[0]
         patch_name = ''.join(
-                ch for ch in first_line if ch.isalnum() or ch == ' ')
+                ch for ch in subject if ch.isalnum() or ch == ' ')
         patch_name = patch_name.replace(' ', '-')
         patch_name += '.patch'
 
@@ -37,7 +31,7 @@ class WorkingRepo(git.Repo):
     def _add_patch_annotation(self, patch_name, quiet=True):
         """Add a patch annotation to the last commit."""
         commit_msg = self.log(count=1, pretty='%B')
-        commit_msg += '\n\nPly-Patch: %s' % patch_name
+        commit_msg = utils.add_patch_annotation(commit_msg, patch_name)
         self.commit(commit_msg, amend=True, quiet=quiet)
 
     def _walk_commit_msgs_backwards(self):
@@ -54,7 +48,7 @@ class WorkingRepo(git.Repo):
         working-repo they were based off of.
         """
         num_applied = len(list(self._applied_patches()))
-        return self.log(count=1, pretty='%H', skip=num_applied)
+        return self.log(count=1, pretty='%H', skip=num_applied).strip()
 
     def _applied_patches(self):
         """Return a list of patches that have already been applied to this
@@ -64,12 +58,12 @@ class WorkingRepo(git.Repo):
         commit without a 'Ply-Patch' commit msg annotation.
         """
         for commit_msg in self._walk_commit_msgs_backwards():
-            patch_name = self._get_patch_annotation(commit_msg)
+            patch_name = utils.get_patch_annotation(commit_msg)
             if not patch_name:
                 break
             yield patch_name
 
-    def _create_patch(self, patch_name):
+    def _create_patch(self, patch_name, revision):
         """Create a patch, move it into the patch-repo and add it to the
         series file if necessary.
         """
@@ -79,31 +73,14 @@ class WorkingRepo(git.Repo):
         if dirname and not os.path.exists(dest_path):
             os.makedirs(dest_path)
 
-        filename = self.format_patch('HEAD^')[0]
+        filenames = self.format_patch('%s^..%s' % (revision, revision))
+        assert len(filenames) == 1
+        filename = filenames[0]
+
         os.rename(os.path.join(self.path, filename),
                   os.path.join(self.patch_repo.path, patch_name))
         self.patch_repo.add(patch_name)
         self.patch_repo.add_patch_to_series(patch_name)
-
-    @staticmethod
-    def _get_patch_annotation(commit_msg):
-        """Return the Ply-Patch annotation if present in the commit msg.
-
-        Returns None if not present.
-        """
-        matches = re.search(RE_PATCH_IDENTIFIER, commit_msg)
-        if not matches:
-            return None
-
-        return matches.group(1)
-
-    def _refresh_patch_for_last_commit(self, quiet=True):
-        """Refresh the patch in the patch-repo that corresponds to the last
-        commit in the working-repo.
-        """
-        commit_msg = self.log(count=1, pretty='%B')
-        patch_name = self._get_patch_annotation(commit_msg)
-        self._create_patch(patch_name)
 
     def _commit_to_patch_repo(self, commit_msg, based_on, quiet=True):
         commit_msg += '\n\nPly-Based-On: %s' % based_on
@@ -120,7 +97,7 @@ class WorkingRepo(git.Repo):
     def _patch_conflict_path(self):
         return os.path.join(self.path, '.patch-conflict')
 
-    def _get_patch_name_from_conflict_file(self):
+    def _teardown_conflict_file(self):
         """Return the patch name from the temporary conflict file.
 
         This is needed so we can add a patch-annotation after resolving a
@@ -144,9 +121,9 @@ class WorkingRepo(git.Repo):
         one time after all of the patches have been applied.
         """
         self.am(resolved=True, quiet=quiet)
-        patch_name = self._get_patch_name_from_conflict_file()
+        patch_name = self._teardown_conflict_file()
+        self._create_patch(patch_name, 'HEAD')
         self._add_patch_annotation(patch_name, quiet=quiet)
-        self._refresh_patch_for_last_commit(quiet=quiet)
 
         try:
             self.restore()  # Apply remaining patches
@@ -186,8 +163,13 @@ class WorkingRepo(git.Repo):
 
     def save(self, since='HEAD^', prefix=None, quiet=True):
         """Save last commit to working-repo as patch in the patch-repo."""
-        patch_name = self._make_patch_name(prefix=prefix)
-        self._create_patch(patch_name)
+        cmd_arg = "%s..HEAD" % since
+        commits = [x.split(' ', 1) for x in self.log(
+                   cmd_arg=cmd_arg, pretty='%H %s').split('\n') if x]
+        commits.reverse()
+        for revision, subject in commits:
+            patch_name = self._make_patch_name(subject, prefix=prefix)
+            self._create_patch(patch_name, revision)
 
         # Rollback and reapply so that the current branch of working-repo has
         # the patch-annotations in its history. Annotations are created on
@@ -204,8 +186,13 @@ class WorkingRepo(git.Repo):
         self.reset('HEAD~%d' % num_applied, hard=True, quiet=quiet)
 
         based_on = self.log(count=1, pretty='%H')
-        self._commit_to_patch_repo(
-                'Adding %s' % patch_name, based_on, quiet=quiet)
+
+        if len(commits) > 1:
+            commit_msg = "Adding %d patches" % len(commits)
+        else:
+            commit_msg = "Adding %s" % patch_name
+
+        self._commit_to_patch_repo(commit_msg, based_on, quiet=quiet)
 
         # Hiding the output of this command because it would be confusing,
         # it's an implementation detail that we have to rollback-and-reapply

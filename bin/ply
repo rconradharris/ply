@@ -72,12 +72,14 @@ def do_save(working_repo, *args):
     quiet = '-v' not in args
 
     prefix = None
+    since = 'HEAD^'
     for arg in args:
         if arg.startswith('--prefix='):
             prefix = arg.replace('--prefix=', '')
-            break
+        if arg.startswith('--since='):
+            since = arg.replace('--since=', '')
 
-    working_repo.save(prefix=prefix, quiet=quiet)
+    working_repo.save(since=since, prefix=prefix, quiet=quiet)
 
 
 def main():
