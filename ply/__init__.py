@@ -13,15 +13,23 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    def _add_patch_annotation(self, commit_msg, quiet=True):
-        """Add a patch annotation to the last commit."""
+    def _add_patch_annotation(self, prefix=None, quiet=True):
+        """Add a patch annotation to the last commit.
+
+        Prefix is an optional subdirectory in the patch-repo where we would
+        like to drop our new patch.
+        """
+        commit_msg = self.log(count=1, pretty='%B')
         # TODO: add dedup'ing in case patch-file of same name already exists
         # in the patch-repo
         first_line = commit_msg.split('\n')[0]
-        first_line = first_line.replace(' ', '-')
         patch_name = ''.join(
-                ch for ch in first_line if ch.isalnum() or ch == '-')
+                ch for ch in first_line if ch.isalnum() or ch == ' ')
+        patch_name = patch_name.replace(' ', '-')
         patch_name += '.patch'
+
+        if prefix:
+            patch_name = os.path.join(prefix, patch_name)
 
         commit_msg += '\n\nPly-Patch: %s' % patch_name
         self.commit(commit_msg, amend=True, quiet=quiet)
@@ -60,6 +68,11 @@ class WorkingRepo(git.Repo):
         """Create a patch, move it into the patch-repo and add it to the
         series file if necessary.
         """
+        # Ensure destination exists (in case a prefix was supplied)
+        dirname = os.path.dirname(patch_name)
+        if dirname:
+            os.makedirs(os.path.join(self.patch_repo.path, dirname))
+
         filename = self.format_patch('HEAD^')[0]
         os.rename(os.path.join(self.path, filename),
                   os.path.join(self.patch_repo.path, patch_name))
@@ -131,10 +144,9 @@ class WorkingRepo(git.Repo):
             patch_path = os.path.join(self.patch_repo.path, patch_name)
             self.am(patch_path, three_way_merge=three_way_merge)
 
-    def save(self, quiet=True):
+    def save(self, prefix=None, quiet=True):
         """Save last commit to working-repo as patch in the patch-repo."""
-        commit_msg = self.log(count=1, pretty='%B')
-        patch_name = self._add_patch_annotation(commit_msg, quiet=quiet)
+        patch_name = self._add_patch_annotation(prefix=prefix, quiet=quiet)
         self._create_patch(patch_name)
         self._commit_to_patch_repo('Adding %s' % patch_name, quiet=quiet)
 

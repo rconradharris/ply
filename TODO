@@ -1,3 +1,4 @@
+- Use argparse in bin/ply
 - Add check to make sure working-repo has changes before saving to patch repo
 - Write a script to create a sandbox with upstream and patch repos and then to
   apply run ply and assert the results.

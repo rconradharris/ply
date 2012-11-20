@@ -39,8 +39,8 @@ def _create_working_repo(working_repo_path, patch_repo):
         f.write(typo_txt.replace('there', 'their'))
 
     working_repo.add('README')
-    working_repo.commit('Typofix', quiet=True)
-    working_repo.save()
+    working_repo.commit('There -> Their', quiet=True)
+    working_repo.save('typofixes')
 
     # Add exclamation point
     with open(readme_path, 'w') as f:

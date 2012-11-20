@@ -40,6 +40,8 @@ def do_init(_, *args):
 def do_resolve(working_repo, *args):
     """Mark conflicts for a patch as resolved and continue applying the rest
     of the patches in the series.
+
+    -v: verbose mode
     """
     quiet = '-v' not in args
     try:
@@ -58,9 +60,21 @@ def do_restore(working_repo):
 
 
 def do_save(working_repo, *args):
-    """Saves last commit as a new patch in the patch-repo."""
+    """Saves last commit as a new patch in the patch-repo.
+
+    -v: verbose mode
+    --prefix: optional subdirectory in the patch-repo in which to drop the
+              newly minted patch
+    """
     quiet = '-v' not in args
-    working_repo.save(quiet=quiet)
+
+    prefix = None
+    for arg in args:
+        if arg.startswith('--prefix='):
+            prefix = arg.replace('--prefix=', '')
+            break
+
+    working_repo.save(prefix=prefix, quiet=quiet)
 
 
 def main():
