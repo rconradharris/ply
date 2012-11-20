@@ -27,6 +27,22 @@ class WorkingRepo(git.Repo):
         self.commit(commit_msg, amend=True, quiet=quiet)
         return patch_name
 
+    def _walk_commit_msgs_backwards(self):
+        skip = 0
+        while True:
+            commit_msg = self.log(count=1, pretty='%B', skip=skip)
+            yield commit_msg
+            skip += 1
+
+    def _last_upstream_commit_hash(self):
+        """Return the hash for the last upstream commit in the repo.
+
+        We use this to annotate patch-repo commits with the version of the
+        working-repo they were based off of.
+        """
+        num_applied = len(list(self._applied_patches()))
+        return self.log(count=1, pretty='%H', skip=num_applied)
+
     def _applied_patches(self):
         """Return a list of patches that have already been applied to this
         branch.
@@ -34,19 +50,11 @@ class WorkingRepo(git.Repo):
         We figure this out by walking backwards from HEAD until we reach a
         commit without a 'Ply-Patch' commit msg annotation.
         """
-        applied = []
-        skip = 0
-        while True:
-            commit_msg = self.log(count=1, pretty='%B', skip=skip)
+        for commit_msg in self._walk_commit_msgs_backwards():
             patch_name = self._get_patch_annotation(commit_msg)
-
             if not patch_name:
                 break
-
-            applied.append(patch_name)
-            skip += 1
-
-        return applied
+            yield patch_name
 
     def _create_patch(self, patch_name):
         """Create a patch, move it into the patch-repo and add it to the
@@ -77,7 +85,12 @@ class WorkingRepo(git.Repo):
         commit_msg = self.log(count=1, pretty='%B')
         patch_name = self._get_patch_annotation(commit_msg)
         self._create_patch(patch_name)
-        self.patch_repo.commit('Refreshing %s' % patch_name, quiet=quiet)
+        self._commit_to_patch_repo('Refreshing %s' % patch_name, quiet=quiet)
+
+    def _commit_to_patch_repo(self, commit_msg, quiet=True):
+        us_hash = self._last_upstream_commit_hash()
+        commit_msg += '\n\nPly-Patch-Based-On: %s' % us_hash
+        self.patch_repo.commit(commit_msg, quiet=quiet)
 
     @property
     def patch_repo(self):
@@ -113,7 +126,7 @@ class WorkingRepo(git.Repo):
         commit_msg = self.log(count=1, pretty='%B')
         patch_name = self._add_patch_annotation(commit_msg, quiet=quiet)
         self._create_patch(patch_name)
-        self.patch_repo.commit('Adding %s' % patch_name, quiet=quiet)
+        self._commit_to_patch_repo('Adding %s' % patch_name, quiet=quiet)
 
 
 class PatchRepo(git.Repo):
