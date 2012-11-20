@@ -40,15 +40,22 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.add('README')
     working_repo.commit('There -> Their', quiet=True)
-    working_repo.save('typofixes')
+    working_repo.save(prefix='typofixes')
 
     # Add exclamation point
     with open(readme_path, 'w') as f:
         f.write(typo_txt.replace('.', '!'))
 
     working_repo.add('README')
-    working_repo.commit('Adding exclamation point.', quiet=True)
+    working_repo.commit('Adding exclamation point', quiet=True)
     working_repo.save()
+
+    # Trunk changes
+    working_repo.reset('HEAD~2', hard=True, quiet=True)
+    with open(readme_path, 'w') as f:
+        f.write(typo_txt.replace('.', '. Fin.'))
+    working_repo.add('README')
+    working_repo.commit('Trunk changed', quiet=True)
 
     return working_repo
 

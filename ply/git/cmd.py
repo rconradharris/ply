@@ -13,6 +13,7 @@ def add(filename):
 def am(*patch_paths, **kwargs):
     three_way_merge = kwargs.get('three_way_merge', False)
     resolved = kwargs.get('resolved', False)
+    quiet = kwargs.get('quiet', False)
 
     args = ['git', 'am']
     args.extend(patch_paths)
@@ -22,6 +23,9 @@ def am(*patch_paths, **kwargs):
 
     if resolved:
         args.append('--resolved')
+
+    if quiet:
+        args.append('-q')
 
     try:
         subprocess.check_call(args)

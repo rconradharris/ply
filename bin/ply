@@ -50,11 +50,14 @@ def do_resolve(working_repo, *args):
         die_on_conflicts()
 
 
-def do_restore(working_repo):
+def do_restore(working_repo, *args):
     """Apply the patch series to the the current branch of the working-repo.
+
+    -v: verbose mode
     """
+    quiet = '-v' not in args
     try:
-        working_repo.restore()
+        working_repo.restore(quiet=quiet)
     except ply.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 

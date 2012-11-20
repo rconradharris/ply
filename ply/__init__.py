@@ -13,8 +13,9 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    def _add_patch_annotation(self, prefix=None, quiet=True):
-        """Add a patch annotation to the last commit.
+    def _make_patch_name(self, prefix=None):
+        """The patch name is a slugified version of the commit msg's first
+        line.
 
         Prefix is an optional subdirectory in the patch-repo where we would
         like to drop our new patch.
@@ -31,9 +32,13 @@ class WorkingRepo(git.Repo):
         if prefix:
             patch_name = os.path.join(prefix, patch_name)
 
+        return patch_name
+
+    def _add_patch_annotation(self, patch_name, quiet=True):
+        """Add a patch annotation to the last commit."""
+        commit_msg = self.log(count=1, pretty='%B')
         commit_msg += '\n\nPly-Patch: %s' % patch_name
         self.commit(commit_msg, amend=True, quiet=quiet)
-        return patch_name
 
     def _walk_commit_msgs_backwards(self):
         skip = 0
@@ -70,8 +75,9 @@ class WorkingRepo(git.Repo):
         """
         # Ensure destination exists (in case a prefix was supplied)
         dirname = os.path.dirname(patch_name)
-        if dirname:
-            os.makedirs(os.path.join(self.patch_repo.path, dirname))
+        dest_path = os.path.join(self.patch_repo.path, dirname)
+        if dirname and not os.path.exists(dest_path):
+            os.makedirs(dest_path)
 
         filename = self.format_patch('HEAD^')[0]
         os.rename(os.path.join(self.path, filename),
@@ -99,9 +105,8 @@ class WorkingRepo(git.Repo):
         patch_name = self._get_patch_annotation(commit_msg)
         self._create_patch(patch_name)
 
-    def _commit_to_patch_repo(self, commit_msg, quiet=True):
-        us_hash = self._last_upstream_commit_hash()
-        commit_msg += '\n\nPly-Based-On: %s' % us_hash
+    def _commit_to_patch_repo(self, commit_msg, based_on, quiet=True):
+        commit_msg += '\n\nPly-Based-On: %s' % based_on
         self.patch_repo.commit(commit_msg, quiet=quiet)
 
     @property
@@ -111,6 +116,25 @@ class WorkingRepo(git.Repo):
         """
         return PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
 
+    @property
+    def _patch_conflict_path(self):
+        return os.path.join(self.path, '.patch-conflict')
+
+    def _get_patch_name_from_conflict_file(self):
+        """Return the patch name from the temporary conflict file.
+
+        This is needed so we can add a patch-annotation after resolving a
+        conflict.
+        """
+        if not os.path.exists(self._patch_conflict_path):
+            raise exc.PathNotFound
+
+        with open(self._patch_conflict_path) as f:
+            patch_name = f.read().strip()
+
+        os.unlink(self._patch_conflict_path)
+        return patch_name
+
     def resolve(self, quiet=True):
         """Resolves a commit and refreshes the affected patch in the
         patch-repo.
@@ -119,36 +143,74 @@ class WorkingRepo(git.Repo):
         patch, which would make for a rather chatty history, we instead commit
         one time after all of the patches have been applied.
         """
-        self.am(resolved=True)
+        self.am(resolved=True, quiet=quiet)
+        patch_name = self._get_patch_name_from_conflict_file()
+        self._add_patch_annotation(patch_name, quiet=quiet)
         self._refresh_patch_for_last_commit(quiet=quiet)
+
         try:
             self.restore()  # Apply remaining patches
         except git.exc.PatchDidNotApplyCleanly:
             raise
         else:
             # Only commit once all of the patches have been applied cleanly
+            based_on = self._last_upstream_commit_hash()
             self._commit_to_patch_repo(
-                    'Refreshing patches', quiet=quiet)
+                    'Refreshing patches', based_on, quiet=quiet)
 
-    def restore(self, three_way_merge=True):
+    def restore(self, three_way_merge=True, quiet=True):
         """Applies a series of patches to the working repo's current branch.
 
         Each patch applied creates a commit in the working repo.
         """
-        applied = self._applied_patches()
+        applied = set(self._applied_patches())
 
         for patch_name in self.patch_repo.series:
             if patch_name in applied:
                 continue
 
             patch_path = os.path.join(self.patch_repo.path, patch_name)
-            self.am(patch_path, three_way_merge=three_way_merge)
 
-    def save(self, prefix=None, quiet=True):
+            try:
+                self.am(patch_path, three_way_merge=three_way_merge,
+                        quiet=quiet)
+            except git.exc.PatchDidNotApplyCleanly:
+                # Memorize the patch-name that caused the conflict so that
+                # when we later resolve it, we can add the patch-annotation
+                with open(self._patch_conflict_path, 'w') as f:
+                    f.write('%s\n' % patch_name)
+
+                raise
+
+            self._add_patch_annotation(patch_name, quiet=quiet)
+
+    def save(self, since='HEAD^', prefix=None, quiet=True):
         """Save last commit to working-repo as patch in the patch-repo."""
-        patch_name = self._add_patch_annotation(prefix=prefix, quiet=quiet)
+        patch_name = self._make_patch_name(prefix=prefix)
         self._create_patch(patch_name)
-        self._commit_to_patch_repo('Adding %s' % patch_name, quiet=quiet)
+
+        # Rollback and reapply so that the current branch of working-repo has
+        # the patch-annotations in its history. Annotations are created on
+        # application of patch not on creation. This makes it easier to
+        # support saving multiple patches as well as making it easier to
+        # rename and move patches in the patch repo, since the name isn't
+        # embedded in the patch itself.
+
+        # Rollback unannotated patches
+        self.reset(since, hard=True, quiet=quiet)
+
+        # Rollback annotated patches
+        num_applied = len(list(self._applied_patches()))
+        self.reset('HEAD~%d' % num_applied, hard=True, quiet=quiet)
+
+        based_on = self.log(count=1, pretty='%H')
+        self._commit_to_patch_repo(
+                'Adding %s' % patch_name, based_on, quiet=quiet)
+
+        # Hiding the output of this command because it would be confusing,
+        # it's an implementation detail that we have to rollback-and-reapply
+        # patches to put the working-repo into the proper state.
+        self.restore(quiet=True)
 
 
 class PatchRepo(git.Repo):
