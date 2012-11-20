@@ -37,27 +37,22 @@ def do_init(_, *args):
     patch_repo.initialize()
 
 
-def do_resolve(working_repo, *args):
-    """Mark conflicts for a patch as resolved and continue applying the rest
-    of the patches in the series.
-
-    -v: verbose mode
-    """
-    quiet = '-v' not in args
-    try:
-        working_repo.resolve(quiet=quiet)
-    except ply.git.exc.PatchDidNotApplyCleanly:
-        die_on_conflicts()
-
-
 def do_restore(working_repo, *args):
     """Apply the patch series to the the current branch of the working-repo.
 
+    --resolved: mark conflicts for a patch as resolved and continue applying
+                the rest of the patches in the series.
+
     -v: verbose mode
     """
     quiet = '-v' not in args
+    resolved = '--resolved' in args
+
     try:
-        working_repo.restore(quiet=quiet)
+        if resolved:
+            working_repo.resolve(quiet=quiet)
+        else:
+            working_repo.restore(quiet=quiet)
     except ply.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
@@ -66,8 +61,13 @@ def do_save(working_repo, *args):
     """Saves last commit as a new patch in the patch-repo.
 
     -v: verbose mode
+
     --prefix: optional subdirectory in the patch-repo in which to drop the
               newly minted patch
+
+    --since: optional revision to bookend where patches begin. The revision
+             should be the one BEFORE the first patch (e.g. uses
+             format-patches 'since' semantics)
     """
     quiet = '-v' not in args
 
