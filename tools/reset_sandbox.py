@@ -26,7 +26,7 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.init('.', quiet=True)
 
     # Link to patch repo
-    os.symlink(patch_repo.path, os.path.join(working_repo.path, '.PATCH_REPO'))
+    os.symlink(patch_repo.path, os.path.join(working_repo.path, '.patch_repo'))
 
     # Create Typo
     readme_path = os.path.join(working_repo_path, 'README')
@@ -41,7 +41,6 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     _assert_text(readme_path, 'Now is the time for all good men to come to'
                               ' the aid of there country.')
-
 
     us_hash = working_repo._last_upstream_commit_hash()
 

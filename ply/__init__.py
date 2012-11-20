@@ -9,25 +9,6 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    def _make_patch_name(self, subject, prefix=None):
-        """The patch name is a slugified version of the commit msg's first
-        line.
-
-        Prefix is an optional subdirectory in the patch-repo where we would
-        like to drop our new patch.
-        """
-        # TODO: add dedup'ing in case patch-file of same name already exists
-        # in the patch-repo
-        patch_name = ''.join(
-                ch for ch in subject if ch.isalnum() or ch == ' ')
-        patch_name = patch_name.replace(' ', '-')
-        patch_name += '.patch'
-
-        if prefix:
-            patch_name = os.path.join(prefix, patch_name)
-
-        return patch_name
-
     def _add_patch_annotation(self, patch_name, quiet=True):
         """Add a patch annotation to the last commit."""
         commit_msg = self.log(count=1, pretty='%B')
@@ -89,9 +70,9 @@ class WorkingRepo(git.Repo):
     @property
     def patch_repo(self):
         """Return a patch repo object associated with this working repo via
-        the `.PATCH_REPO` symlink.
+        the `.patch_repo` symlink.
         """
-        return PatchRepo(os.path.join(self.path, '.PATCH_REPO'))
+        return PatchRepo(os.path.join(self.path, '.patch_repo'))
 
     @property
     def _patch_conflict_path(self):
@@ -168,7 +149,7 @@ class WorkingRepo(git.Repo):
                    cmd_arg=cmd_arg, pretty='%H %s').split('\n') if x]
         commits.reverse()
         for revision, subject in commits:
-            patch_name = self._make_patch_name(subject, prefix=prefix)
+            patch_name = utils.make_patch_name(subject, prefix=prefix)
             self._create_patch(patch_name, revision)
 
         # Rollback and reapply so that the current branch of working-repo has
