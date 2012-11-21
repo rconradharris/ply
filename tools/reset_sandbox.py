@@ -57,7 +57,7 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.add('README')
     working_repo.commit('Adding exclamation point', quiet=True)
-    working_repo.save(since=us_hash)
+    working_repo.save(us_hash)
 
     # Trunk changes
     working_repo.reset('HEAD~2', hard=True, quiet=True)
@@ -102,7 +102,7 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.add('README')
     working_repo.commit("Oneline")
-    working_repo.save()
+    working_repo.save('HEAD^')
 
     return working_repo
 

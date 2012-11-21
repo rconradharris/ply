@@ -4,7 +4,7 @@ import setuptools
 setuptools.setup(
     name='ply',
     version='0.1',
-    description='Patch Manager for Git',
+    description='Git-based Patch Management',
     url='https://github.com/rconradharris/ply',
     license='MIT',
     author='Rick Harris',

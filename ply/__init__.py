@@ -44,24 +44,19 @@ class WorkingRepo(git.Repo):
                 break
             yield patch_name
 
-    def _create_patch(self, patch_name, revision):
-        """Create a patch, move it into the patch-repo and add it to the
-        series file if necessary.
-        """
-        # Ensure destination exists (in case a prefix was supplied)
-        dirname = os.path.dirname(patch_name)
-        dest_path = os.path.join(self.patch_repo.path, dirname)
-        if dirname and not os.path.exists(dest_path):
-            os.makedirs(dest_path)
+    def _store_patch_files(self, patch_names, filenames):
+        """Store a set of patch files in the patch-repo."""
+        for patch_name, filename in zip(patch_names, filenames):
+            # Ensure destination exists (in case a prefix was supplied)
+            dirname = os.path.dirname(patch_name)
+            dest_path = os.path.join(self.patch_repo.path, dirname)
+            if dirname and not os.path.exists(dest_path):
+                os.makedirs(dest_path)
 
-        filenames = self.format_patch('%s^..%s' % (revision, revision))
-        assert len(filenames) == 1
-        filename = filenames[0]
-
-        os.rename(os.path.join(self.path, filename),
-                  os.path.join(self.patch_repo.path, patch_name))
-        self.patch_repo.add(patch_name)
-        self.patch_repo.add_patch_to_series(patch_name)
+            os.rename(os.path.join(self.path, filename),
+                      os.path.join(self.patch_repo.path, patch_name))
+            self.patch_repo.add(patch_name)
+            self.patch_repo.add_patch_to_series(patch_name)
 
     def _commit_to_patch_repo(self, commit_msg, based_on, quiet=True):
         commit_msg += '\n\nPly-Based-On: %s' % based_on
@@ -103,7 +98,9 @@ class WorkingRepo(git.Repo):
         """
         self.am(resolved=True, quiet=quiet)
         patch_name = self._teardown_conflict_file()
-        self._create_patch(patch_name, 'HEAD')
+        filenames = self.format_patch('HEAD^')
+        self._store_patch_files([patch_name], filenames)
+
         self._add_patch_annotation(patch_name, quiet=quiet)
 
         try:
@@ -142,15 +139,32 @@ class WorkingRepo(git.Repo):
 
             self._add_patch_annotation(patch_name, quiet=quiet)
 
-    def save(self, since='HEAD^', prefix=None, quiet=True):
-        """Save last commit to working-repo as patch in the patch-repo."""
-        cmd_arg = "%s..HEAD" % since
-        commits = [x.split(' ', 1) for x in self.log(
-                   cmd_arg=cmd_arg, pretty='%H %s').split('\n') if x]
-        commits.reverse()
-        for revision, subject in commits:
-            patch_name = utils.make_patch_name(subject, prefix=prefix)
-            self._create_patch(patch_name, revision)
+    def save(self, since, prefix=None, quiet=True):
+        """Save a series of commits as patches into the patch-repo."""
+        filenames = self.format_patch(since)
+
+        patch_names = []
+        for filename in filenames:
+            # Strip 0001- prefix that git format-patch provides. Like `quilt`,
+            # `ply` uses a `series` for patch ordering.
+            patch_name = filename.split('-', 1)[1]
+
+            # Add our own subdirectory prefix, if needed
+            if prefix:
+                patch_name = os.path.join(prefix, patch_name)
+
+            patch_names.append(patch_name)
+
+        self._store_patch_files(patch_names, filenames)
+
+        #cmd_arg = "%s..HEAD" % since
+        #commits = [x.split(' ', 1) for x in self.log(
+        #           cmd_arg=cmd_arg, pretty='%H %s').split('\n') if x]
+        #commits.reverse()
+        #for revision, subject in commits:
+        #    patch_name = utils.make_patch_name(subject, prefix=prefix)
+        #    filenames = self._create_patch_files(revision)
+        #    self._store_patch_files([patch_name], filenames)
 
         # Rollback and reapply so that the current branch of working-repo has
         # the patch-annotations in its history. Annotations are created on
@@ -168,8 +182,8 @@ class WorkingRepo(git.Repo):
 
         based_on = self.log(count=1, pretty='%H')
 
-        if len(commits) > 1:
-            commit_msg = "Adding %d patches" % len(commits)
+        if len(filenames) > 1:
+            commit_msg = "Adding %d patches" % len(filenames)
         else:
             commit_msg = "Adding %s" % patch_name
 

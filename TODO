@@ -1,3 +1,5 @@
+- Add back link command
+- Make .patch_repo -> .patch-repo
 - Add a way to abort a restore, --abort
 - Add check to make sure working-repo has changes before saving to patch repo
 

@@ -65,21 +65,26 @@ def do_save(working_repo, *args):
     --prefix: optional subdirectory in the patch-repo in which to drop the
               newly minted patch
 
-    --since: optional revision to bookend where patches begin. The revision
+    since: optional revision to bookend where patches begin. The revision
              should be the one BEFORE the first patch (e.g. uses
              format-patches 'since' semantics)
     """
     quiet = '-v' not in args
 
     prefix = None
-    since = 'HEAD^'
+    positional = []
     for arg in args:
         if arg.startswith('--prefix='):
             prefix = arg.replace('--prefix=', '')
-        if arg.startswith('--since='):
-            since = arg.replace('--since=', '')
+        else:
+            positional.append(arg)
 
-    working_repo.save(since=since, prefix=prefix, quiet=quiet)
+    try:
+        since = positional[0]
+    except IndexError:
+        die("ply save <since>")
+
+    working_repo.save(since, prefix=prefix, quiet=quiet)
 
 
 def main():
