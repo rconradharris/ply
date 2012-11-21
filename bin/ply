@@ -28,13 +28,22 @@ def die_on_conflicts():
 
 
 def do_init(_, *args):
-    """Link a working repo to a patch repo."""
+    """Initialize a new patch-repo."""
     if not args:
         die("ply init <patch-repo-path>")
 
     patch_repo_path = args[0]
     patch_repo = ply.PatchRepo(patch_repo_path)
     patch_repo.initialize()
+
+
+def do_link(working_repo, *args):
+    """Link a working repo to a patch repo."""
+    if not args:
+        die("ply link <patch-repo-path>")
+
+    patch_repo_path = args[0]
+    working_repo.link(patch_repo_path)
 
 
 def do_restore(working_repo, *args):

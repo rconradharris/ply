@@ -63,11 +63,15 @@ class WorkingRepo(git.Repo):
         self.patch_repo.commit(commit_msg, quiet=quiet)
 
     @property
+    def patch_repo_path(self):
+        return os.path.join(self.path, '.patch_repo')
+
+    @property
     def patch_repo(self):
         """Return a patch repo object associated with this working repo via
         the `.patch_repo` symlink.
         """
-        return PatchRepo(os.path.join(self.path, '.patch_repo'))
+        return PatchRepo(self.patch_repo_path)
 
     @property
     def _patch_conflict_path(self):
@@ -87,6 +91,10 @@ class WorkingRepo(git.Repo):
 
         os.unlink(self._patch_conflict_path)
         return patch_name
+
+    def link(self, patch_repo_path):
+        """Link a working-repo to a patch-repo."""
+        os.symlink(patch_repo_path, self.patch_repo_path)
 
     def resolve(self, quiet=True):
         """Resolves a commit and refreshes the affected patch in the
@@ -156,15 +164,6 @@ class WorkingRepo(git.Repo):
             patch_names.append(patch_name)
 
         self._store_patch_files(patch_names, filenames)
-
-        #cmd_arg = "%s..HEAD" % since
-        #commits = [x.split(' ', 1) for x in self.log(
-        #           cmd_arg=cmd_arg, pretty='%H %s').split('\n') if x]
-        #commits.reverse()
-        #for revision, subject in commits:
-        #    patch_name = utils.make_patch_name(subject, prefix=prefix)
-        #    filenames = self._create_patch_files(revision)
-        #    self._store_patch_files([patch_name], filenames)
 
         # Rollback and reapply so that the current branch of working-repo has
         # the patch-annotations in its history. Annotations are created on
