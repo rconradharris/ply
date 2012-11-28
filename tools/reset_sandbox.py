@@ -102,7 +102,10 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.add('README')
     working_repo.commit("Oneline")
-    working_repo.save('HEAD^')
+    working_repo.save('HEAD^', quiet=True)
+
+    working_repo.rollback(quiet=True)
+    working_repo.restore(quiet=True)
 
     return working_repo
 

@@ -147,6 +147,11 @@ class WorkingRepo(git.Repo):
 
             self._add_patch_annotation(patch_name, quiet=quiet)
 
+    def rollback(self, quiet=True):
+        """Rollback to that last upstream commit."""
+        based_on = self._last_upstream_commit_hash()
+        self.reset(based_on, hard=True, quiet=quiet)
+
     def save(self, since, prefix=None, quiet=True):
         """Save a series of commits as patches into the patch-repo."""
         if '..' in since:

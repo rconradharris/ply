@@ -22,7 +22,7 @@ def die_on_conflicts():
     print
     print "\t1) Fix conflicts in affected files"
     print "\n\t2) `git add` affected files"
-    print "\n\t3) Run `ply resolve` to refresh the patch and"\
+    print "\n\t3) Run `ply restore --resolved` to refresh the patch and"\
           " apply the rest\n\t   of the patches in the series."
     sys.exit(1)
 
@@ -66,6 +66,17 @@ def do_restore(working_repo, *args):
         die_on_conflicts()
 
 
+def do_rollback(working_repo, *args):
+    """Rollback to the last upstream commit.
+
+    This is just a convenience so that you don't have to search the git
+    history for the earliest Ply-Patch commit and `git reset --hard` to its
+    parent.
+    """
+    quiet = '-v' not in args
+    working_repo.rollback(quiet=quiet)
+
+
 def do_save(working_repo, *args):
     """Saves last commit as a new patch in the patch-repo.
 
@@ -76,7 +87,8 @@ def do_save(working_repo, *args):
 
     since: optional revision to bookend where patches begin. The revision
              should be the one BEFORE the first patch (e.g. uses
-             format-patches 'since' semantics)
+             format-patches 'since' semantics). `..` is not supported at this
+             time.
     """
     quiet = '-v' not in args
 
