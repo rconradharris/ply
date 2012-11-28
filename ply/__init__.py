@@ -12,8 +12,9 @@ class WorkingRepo(git.Repo):
     def _add_patch_annotation(self, patch_name, quiet=True):
         """Add a patch annotation to the last commit."""
         commit_msg = self.log(count=1, pretty='%B')
-        commit_msg = utils.add_patch_annotation(commit_msg, patch_name)
-        self.commit(commit_msg, amend=True, quiet=quiet)
+        if 'Ply-Patch' not in commit_msg:
+            commit_msg = utils.add_patch_annotation(commit_msg, patch_name)
+            self.commit(commit_msg, amend=True, quiet=quiet)
 
     def _walk_commit_msgs_backwards(self):
         skip = 0
@@ -58,7 +59,8 @@ class WorkingRepo(git.Repo):
             self.patch_repo.add(patch_name)
             self.patch_repo.add_patch_to_series(patch_name)
 
-    def _commit_to_patch_repo(self, commit_msg, based_on, quiet=True):
+    def _commit_to_patch_repo(self, commit_msg, quiet=True):
+        based_on = self._last_upstream_commit_hash()
         commit_msg += '\n\nPly-Based-On: %s' % based_on
         self.patch_repo.commit(commit_msg, quiet=quiet)
 
@@ -117,9 +119,7 @@ class WorkingRepo(git.Repo):
             raise
         else:
             # Only commit once all of the patches have been applied cleanly
-            based_on = self._last_upstream_commit_hash()
-            self._commit_to_patch_repo(
-                    'Refreshing patches', based_on, quiet=quiet)
+            self._commit_to_patch_repo('Refreshing patches', quiet=quiet)
 
     def restore(self, three_way_merge=True, quiet=True):
         """Applies a series of patches to the working repo's current branch.
@@ -149,6 +149,9 @@ class WorkingRepo(git.Repo):
 
     def save(self, since, prefix=None, quiet=True):
         """Save a series of commits as patches into the patch-repo."""
+        if '..' in since:
+            raise ValueError(".. not supported at the moment")
+
         filenames = self.format_patch(since)
 
         patch_names = []
@@ -165,28 +168,18 @@ class WorkingRepo(git.Repo):
 
         self._store_patch_files(patch_names, filenames)
 
-        # Rollback and reapply so that the current branch of working-repo has
-        # the patch-annotations in its history. Annotations are created on
-        # application of patch not on creation. This makes it easier to
-        # support saving multiple patches as well as making it easier to
-        # rename and move patches in the patch repo, since the name isn't
-        # embedded in the patch itself.
-
-        # Rollback unannotated patches
-        self.reset(since, hard=True, quiet=quiet)
-
-        # Rollback annotated patches
-        num_applied = len(list(self._applied_patches()))
-        self.reset('HEAD~%d' % num_applied, hard=True, quiet=quiet)
-
-        based_on = self.log(count=1, pretty='%H')
+        # Rollback unannotated patches (then roll-foward later)
+        #
+        # We need to do this so that the patches we just created will have
+        # patch-annotations in the working-repo history.
+        self.reset('HEAD~%d' % len(filenames), hard=True, quiet=quiet)
 
         if len(filenames) > 1:
             commit_msg = "Adding %d patches" % len(filenames)
         else:
             commit_msg = "Adding %s" % patch_name
 
-        self._commit_to_patch_repo(commit_msg, based_on, quiet=quiet)
+        self._commit_to_patch_repo(commit_msg, quiet=quiet)
 
         # Hiding the output of this command because it would be confusing,
         # it's an implementation detail that we have to rollback-and-reapply

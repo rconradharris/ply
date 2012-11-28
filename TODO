@@ -1,3 +1,9 @@
+- Remove get_patch_annotation
+- Remove make_patch_name
+- Remove ply/utils
+- Improve output
+- Add rollback command
+- Hide errors from `git am` when merge fails, we supply our own
 - Add a way to abort a restore, --abort
 - Add check to make sure working-repo has changes before saving to patch repo
 
