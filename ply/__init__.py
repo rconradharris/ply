@@ -161,13 +161,19 @@ class WorkingRepo(git.Repo):
 
         patch_names = []
         for filename in filenames:
-            # Strip 0001- prefix that git format-patch provides. Like `quilt`,
-            # `ply` uses a `series` for patch ordering.
-            patch_name = filename.split('-', 1)[1]
+            # If commit already has annotation, use that patch-name
+            with open(os.path.join(self.path, filename)) as f:
+                patch_name = utils.get_patch_annotation(f.read())
 
-            # Add our own subdirectory prefix, if needed
-            if prefix:
-                patch_name = os.path.join(prefix, patch_name)
+            # Otherwise... take it from the `git format-patch` filename
+            if not patch_name:
+                # Strip 0001- prefix that git format-patch provides. Like
+                # `quilt`, `ply` uses a `series` for patch ordering.
+                patch_name = filename.split('-', 1)[1]
+
+                # Add our own subdirectory prefix, if needed
+                if prefix:
+                    patch_name = os.path.join(prefix, patch_name)
 
             patch_names.append(patch_name)
 
@@ -177,7 +183,8 @@ class WorkingRepo(git.Repo):
         #
         # We need to do this so that the patches we just created will have
         # patch-annotations in the working-repo history.
-        self.reset('HEAD~%d' % len(filenames), hard=True, quiet=quiet)
+        num_patches = len(list(self.patch_repo.series))
+        self.reset('HEAD~%d' % num_patches, hard=True, quiet=quiet)
 
         if len(filenames) > 1:
             commit_msg = "Adding %d patches" % len(filenames)
