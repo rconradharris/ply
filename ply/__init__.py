@@ -13,7 +13,7 @@ class WorkingRepo(git.Repo):
         """Add a patch annotation to the last commit."""
         commit_msg = self.log(count=1, pretty='%B')
         if 'Ply-Patch' not in commit_msg:
-            commit_msg = utils.add_patch_annotation(commit_msg, patch_name)
+            commit_msg += '\n\nPly-Patch: %s' % patch_name
             self.commit(commit_msg, amend=True, quiet=quiet)
 
     def _walk_commit_msgs_backwards(self):
