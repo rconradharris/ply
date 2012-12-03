@@ -70,6 +70,19 @@ def commit(msg, all=False, amend=False, use_commit_object=None, quiet=False):
     subprocess.check_call(args)
 
 
+def diff_index(treeish, name_only=False):
+    """git diff-index --name-only HEAD --"""
+    args = ['git', 'diff-index', treeish]
+    if name_only:
+        args.append('--name-only')
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    stdout, stderr = proc.communicate()
+    if proc.returncode != 0:
+        raise exc.GitException((proc.returncode, stdout, stderr))
+    filenames = [line.strip() for line in stdout.split('\n') if line]
+    return filenames
+
+
 def format_patch(since):
     """Returns a list of patch files"""
     args = ['git', 'format-patch', since]
@@ -146,7 +159,11 @@ class Repo(object):
                 return fn(*args, **kwargs)
         return wrapper
 
+    def uncommitted_changes(self):
+        return len(self.diff_index('HEAD')) != 0
 
-__cmds__ = ['add', 'am', 'checkout', 'commit', 'format_patch', 'init', 'log',
-            'reset']
+
+__cmds__ = ['add', 'am', 'checkout', 'commit', 'diff_index', 'format_patch',
+            'init', 'log', 'reset']
+
 __all__ = __cmds__ + ['Repo']

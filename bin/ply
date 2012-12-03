@@ -27,6 +27,10 @@ def die_on_conflicts():
     sys.exit(1)
 
 
+def die_on_uncommitted_changes():
+    die('ERROR: Uncommitted changes, commit or discard before continuing.')
+
+
 def do_init(_, *args):
     """Initialize a new patch-repo."""
     if not args:
@@ -61,7 +65,10 @@ def do_restore(working_repo, *args):
         if resolved:
             working_repo.resolve(quiet=quiet)
         else:
-            working_repo.restore(quiet=quiet)
+            try:
+                working_repo.restore(quiet=quiet)
+            except ply.exc.UncommittedChanges:
+                die_on_uncommitted_changes()
     except ply.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
@@ -74,7 +81,10 @@ def do_rollback(working_repo, *args):
     parent.
     """
     quiet = '-v' not in args
-    working_repo.rollback(quiet=quiet)
+    try:
+        working_repo.rollback(quiet=quiet)
+    except ply.exc.UncommittedChanges:
+        die_on_uncommitted_changes()
 
 
 def do_save(working_repo, *args):
@@ -105,7 +115,10 @@ def do_save(working_repo, *args):
     except IndexError:
         die("ply save <since>")
 
-    working_repo.save(since, prefix=prefix, quiet=quiet)
+    try:
+        working_repo.save(since, prefix=prefix, quiet=quiet)
+    except ply.exc.UncommittedChanges:
+        die_on_uncommitted_changes()
 
 
 def main():

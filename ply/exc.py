@@ -8,3 +8,7 @@ class AlreadyLinkedToPatchRepo(PlyException):
 
 class PathNotFound(PlyException):
     pass
+
+
+class UncommittedChanges(PlyException):
+    pass

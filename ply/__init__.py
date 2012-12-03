@@ -126,6 +126,9 @@ class WorkingRepo(git.Repo):
 
         Each patch applied creates a commit in the working repo.
         """
+        if self.uncommitted_changes():
+            raise exc.UncommittedChanges
+
         applied = set(self._applied_patches())
 
         for patch_name in self.patch_repo.series:
@@ -149,11 +152,17 @@ class WorkingRepo(git.Repo):
 
     def rollback(self, quiet=True):
         """Rollback to that last upstream commit."""
+        if self.uncommitted_changes():
+            raise exc.UncommittedChanges
+
         based_on = self._last_upstream_commit_hash()
         self.reset(based_on, hard=True, quiet=quiet)
 
     def save(self, since, prefix=None, quiet=True):
         """Save a series of commits as patches into the patch-repo."""
+        if self.uncommitted_changes():
+            raise exc.UncommittedChanges
+
         if '..' in since:
             raise ValueError(".. not supported at the moment")
 

@@ -107,6 +107,21 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.rollback(quiet=True)
     working_repo.restore(quiet=True)
 
+    # Make uncommitted unchange
+    with open(readme_path, 'a') as f:
+        f.write('\Uncommitted change')
+
+    # Ensure uncommitted change is raised
+    try:
+        working_repo.restore(quiet=True)
+    except ply.exc.UncommittedChanges:
+        pass
+    else:
+        raise AssertionError('Restore should have failed due to uncommitted'
+                              ' changes.')
+
+    working_repo.reset('HEAD', hard=True)
+
     return working_repo
 
 
