@@ -128,6 +128,9 @@ def _create_working_repo(working_repo_path, patch_repo):
     assert 'Oneline.patch' in set(working_repo.patch_repo.series)
 
     working_repo.rollback(quiet=True)
+
+    assert working_repo.status == 'no-patches-applied', working_repo.status
+
     with open(readme_path, 'a') as f:
         f.write('\nOne line')
 
@@ -141,6 +144,8 @@ def _create_working_repo(working_repo_path, patch_repo):
         pass
     else:
         raise AssertionError('Should have conflicted.')
+
+    assert working_repo.status == 'restore-in-progress', working_repo.status
 
     fixed_txt = txt + ' Fin.'
     fixed_txt = fixed_txt.replace('there', 'their')
@@ -168,6 +173,8 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.resolve(quiet=True)
 
     assert 'Oneline.patch' not in set(working_repo.patch_repo.series)
+
+    assert working_repo.status == 'all-patches-applied', working_repo.status
 
     # Merge upstream exact match and no conflicts so patch-repo commit needs
     # to have been done in the restore method.

@@ -129,6 +129,18 @@ def do_save(working_repo, *args):
         die_on_uncommitted_changes()
 
 
+def do_status(working_repo, *args):
+    """Show status of the working-repo."""
+    status = working_repo.status
+
+    if status == 'restore-in-progress':
+        die('Restore in progress, use --skip and --resolved to continue')
+    elif status == 'no-patches-applied':
+        die('No patches applied')
+    else:
+        die('All patches applied')
+
+
 def main():
     if len(sys.argv) < 2:
         usage()

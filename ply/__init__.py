@@ -85,6 +85,9 @@ class WorkingRepo(git.Repo):
     def _patch_conflict_path(self):
         return os.path.join(self.path, '.patch-conflict')
 
+    def _conflict_file_exists(self):
+        return os.path.exists(self._patch_conflict_path)
+
     def _create_conflict_file(self, patch_name):
         """The conflict-file gives us a way to memorize the patch-name of the
         conflicting patch so that we can apply the patch-annotation after the
@@ -233,6 +236,17 @@ class WorkingRepo(git.Repo):
         num_patches = len(list(self.patch_repo.series))
         self.reset('HEAD~%d' % num_patches, hard=True, quiet=quiet)
         self.restore(quiet=False)
+
+    @property
+    def status(self):
+        """Return the status of the working-repo."""
+        if self._conflict_file_exists():
+            return 'restore-in-progress'
+
+        if len(list(self._applied_patches())) == 0:
+            return 'no-patches-applied'
+
+        return 'all-patches-applied'
 
 
 class PatchRepo(git.Repo):

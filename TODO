@@ -1,12 +1,8 @@
-- Add status command:
-    - No patches applied
-    - All %d patches applied
-    - Restore in progress, use --skip and --resolved to continue
-
 - Add check command
     Count number of patches in patch-repo and ensure it matches number of
     lines in series file.
 
+- Make _applied_patches return a list, generator is a hassle
 - Improve output
 - Hide errors from `git am` when merge fails, we supply our own
     - Use --resolvemsg when `am` fails
