@@ -69,7 +69,9 @@ Usage
    Note: If the upstream patch is an exact match of the version in the
    patch-repo, `ply` will automatically remove the patch from the patch-repo.
 
-* Perform a health-check on the patch-repo::
+* Perform a health-check on the patch-repo. This ensures that all of the
+  patches in the patch-repo are accounted for in the `series` file and that we
+  have no orphans::
 
     ply check
     OK
