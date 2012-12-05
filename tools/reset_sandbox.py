@@ -196,6 +196,22 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.commit('Merging newfile.txt upstream', quiet=True)
 
     working_repo.restore(quiet=True)
+
+    # Test patch-repo health checks
+    assert working_repo.patch_repo.check() == ('ok', {})
+
+    bogus_patch_path = os.path.join(
+        working_repo.patch_repo.path, 'bogus.patch')
+
+    with open(bogus_patch_path, 'w') as f:
+        pass
+
+    assert working_repo.patch_repo.check() == ('failed',
+            dict(no_file=set(), no_series_entry=set(['bogus.patch'])))
+
+    os.unlink(bogus_patch_path)
+    assert working_repo.patch_repo.check() == ('ok', {})
+
     return working_repo
 
 

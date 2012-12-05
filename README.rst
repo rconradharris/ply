@@ -36,6 +36,11 @@ Usage
 
     ply link ../my-patch-repo  # from within the working-repo
 
+* Check that status of a `working-repo`::
+
+    ply status
+    All patches applied
+
 * Save the last commit as a new patch in the `patch-repo`::
 
     ply save        # Without arguments, HEAD^ is assumed
@@ -55,7 +60,6 @@ Usage
 
     ply restore --resolved
 
-
 * Skip a patch that has already merged upstream. In addition to performing a
   `git am --skip`, this will also remove the relevant patch from the
   `patch-repo`::
@@ -64,3 +68,8 @@ Usage
 
    Note: If the upstream patch is an exact match of the version in the
    patch-repo, `ply` will automatically remove the patch from the patch-repo.
+
+* Perform a health-check on the patch-repo::
+
+    ply check
+    OK

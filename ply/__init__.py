@@ -233,7 +233,7 @@ class WorkingRepo(git.Repo):
 
         # Rollback and reapply patches so taht working repo has
         # patch-annotations for latest saved patches
-        num_patches = len(list(self.patch_repo.series))
+        num_patches = len(self.patch_repo.series)
         self.reset('HEAD~%d' % num_patches, hard=True, quiet=quiet)
         self.restore(quiet=False)
 
@@ -248,9 +248,45 @@ class WorkingRepo(git.Repo):
 
         return 'all-patches-applied'
 
+    def check_patch_repo(self):
+        return self.patch_repo.check()
+
 
 class PatchRepo(git.Repo):
     """Represents a git repo containing versioned patch files."""
+
+    def check(self):
+        """Sanity check the patch-repo.
+
+        This ensures that the number of patches in the patch-repo matches the
+        series file.
+        """
+        series = set(self.series)
+        patch_names = set(self.patch_names)
+
+        # Has entry in series file but not actually present
+        no_file = series - patch_names
+
+        # Patch files exists, but no entry in series file
+        no_series_entry = patch_names - series
+
+        if not no_file and not no_series_entry:
+            return ('ok', {})
+
+        return ('failed', dict(no_file=no_file,
+                               no_series_entry=no_series_entry))
+
+    @property
+    def patch_names(self):
+        """Return all patch files in the patch-repo (recursively)."""
+        patch_names = []
+        # Strip base path so that we end up with relative paths against the
+        # patch-repo making the results `patch_names`
+        strip = self.path + '/'
+        for path in utils.recursive_glob(self.path, '*.patch'):
+            patch_names.append(path.replace(strip, ''))
+        return patch_names
+
     def add_patch(self, patch_name):
         self.add(patch_name)
 
@@ -294,7 +330,11 @@ class PatchRepo(git.Repo):
 
     @property
     def series(self):
+        entries = []
+
         with open(self.series_path, 'r') as f:
             for line in f:
                 patch_name = line.strip()
-                yield patch_name
+                entries.append(patch_name)
+
+        return entries

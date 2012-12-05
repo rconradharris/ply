@@ -31,6 +31,26 @@ def die_on_uncommitted_changes():
     die('ERROR: Uncommitted changes, commit or discard before continuing.')
 
 
+def do_check(working_repo, *args):
+    """Peform a health check on the patch-repo."""
+    status, errors = working_repo.check_patch_repo()
+
+    print status.upper()
+
+    if status == 'ok':
+        return
+
+    if errors['no_file']:
+        print 'Entry in series-file but patch not present:'
+        for patch_name in errors['no_file']:
+            print '\t- %s' % patch_name
+
+    if errors['no_series_entry']:
+        print 'Patch is present but no entry in series file:'
+        for patch_name in errors['no_series_entry']:
+            print '\t- %s' % patch_name
+
+
 def do_init(_, *args):
     """Initialize a new patch-repo."""
     if not args:
