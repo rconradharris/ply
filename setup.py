@@ -2,9 +2,9 @@ import setuptools
 
 
 setuptools.setup(
-    name='ply',
+    name='ply_patch',
     version='0.1',
-    description='Git-based Patch Management',
+    description='Ply: Git-based Patch Management',
     url='https://github.com/rconradharris/ply',
     license='MIT',
     author='Rick Harris',

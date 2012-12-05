@@ -1,8 +1,8 @@
 import os
 import shutil
 
-import ply
-from ply import git
+import ply_patch
+from ply_patch import git
 
 
 SANDBOX = 'sandbox'
@@ -10,7 +10,7 @@ SANDBOX = 'sandbox'
 
 def _create_patch_repo(patch_repo_path):
     _create_directory(patch_repo_path)
-    patch_repo = ply.PatchRepo(patch_repo_path)
+    patch_repo = ply_patch.PatchRepo(patch_repo_path)
     patch_repo.initialize()
     return patch_repo
 
@@ -22,7 +22,7 @@ def _assert_text(readme_path, expected):
 
 def _create_working_repo(working_repo_path, patch_repo):
     _create_directory(working_repo_path)
-    working_repo = ply.WorkingRepo(working_repo_path)
+    working_repo = ply_patch.WorkingRepo(working_repo_path)
     working_repo.init('.', quiet=True)
 
     # Link to patch repo
@@ -69,7 +69,7 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     try:
         working_repo.restore(quiet=True)
-    except ply.git.exc.PatchDidNotApplyCleanly:
+    except ply_patch.git.exc.PatchDidNotApplyCleanly:
         pass
 
     # Fix typo conflict
@@ -81,7 +81,7 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     try:
         working_repo.resolve()
-    except ply.git.exc.PatchDidNotApplyCleanly:
+    except ply_patch.git.exc.PatchDidNotApplyCleanly:
         pass
 
     # Fix exclamation point conflict
@@ -114,7 +114,7 @@ def _create_working_repo(working_repo_path, patch_repo):
     # Ensure uncommitted change is raised
     try:
         working_repo.restore(quiet=True)
-    except ply.exc.UncommittedChanges:
+    except ply_patch.exc.UncommittedChanges:
         pass
     else:
         raise AssertionError('Restore should have failed due to uncommitted'
@@ -140,7 +140,7 @@ def _create_working_repo(working_repo_path, patch_repo):
     # Fix There -> Their conflict
     try:
         working_repo.restore(quiet=True)
-    except ply.git.exc.PatchDidNotApplyCleanly:
+    except ply_patch.git.exc.PatchDidNotApplyCleanly:
         pass
     else:
         raise AssertionError('Should have conflicted.')
@@ -159,7 +159,7 @@ def _create_working_repo(working_repo_path, patch_repo):
     # Fix exclamation point patch
     try:
         working_repo.resolve(quiet=True)
-    except ply.git.exc.PatchDidNotApplyCleanly:
+    except ply_patch.git.exc.PatchDidNotApplyCleanly:
         pass
     else:
         raise AssertionError('Should have conflicted.')
