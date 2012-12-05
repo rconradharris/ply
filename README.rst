@@ -6,10 +6,10 @@ ply - git-based patch management
 Description
 ===========
 
-`ply` is a utility to manage a series of patches against an upstream project.
-These patches are stored as files in a separate git repositiory so that they
-can themselves be versioned. These patches can then be applied to create a
-patched version of the code to be used for packaging and deployment.
+``ply`` is a utility to manage a series of patches against an upstream
+project.  These patches are stored as files in a separate git repositiory so
+that they can themselves be versioned. These patches can then be applied to
+create a patched version of the code to be used for packaging and deployment.
 
 
 Concepts
@@ -61,17 +61,16 @@ Usage
     ply restore --resolved
 
 * Skip a patch that has already merged upstream. In addition to performing a
-  `git am --skip`, this will also remove the relevant patch from the
+  ``git am --skip``, this will also remove the relevant patch from the
   `patch-repo`::
 
         ply restore --skip
 
    Note: If the upstream patch is an exact match of the version in the
-   patch-repo, `ply` will automatically remove the patch from the patch-repo.
+   patch-repo, ``ply`` will automatically remove the patch from the patch-repo.
 
 * Perform a health-check on the patch-repo. This ensures that all of the
-  patches in the patch-repo are accounted for in the `series` file and that we
-  have no orphans::
+  patches in the patch-repo are accounted for in the `patch-series`::
 
     ply check
     OK
@@ -84,15 +83,15 @@ Tools for managing patches have existed for a while, so why create another?
 
 The short answer is:
 
-`quilt` deals in patch-files which can be versioned but doesn't understand
+``quilt`` deals in patch-files which can be versioned but doesn't understand
 version-control. This orthogonality, in some respect, is elegant, but is a
-hassle in day-to-day use. Why checkpoint files in `quilt` when your version
+hassle in day-to-day use. Why checkpoint files in ``quilt`` when your version
 control system already does that for you?
 
-`stgit` (stacked-git) understands version control but stores patches as commit
+``stgit`` (stacked-git) understands version control but stores patches as commit
 objects, not as patch files. This means you can't version your patches, making
 it impossible to rollback when things go awry.
 
-`ply` blends these two tools together to create a tool that understands
-version-control but at the same time stores patches as files which can be
+``ply`` blends these two tools together to create a tool that understands
+version-control but at the same time stores patches as files which can
 themselves be versioned.
