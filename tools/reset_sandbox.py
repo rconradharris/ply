@@ -109,7 +109,7 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     # Make uncommitted unchange
     with open(readme_path, 'a') as f:
-        f.write('\Uncommitted change')
+        f.write('Uncommitted change')
 
     # Ensure uncommitted change is raised
     try:
@@ -122,6 +122,73 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.reset('HEAD', hard=True)
 
+    # Merge 'One line' change upstream.
+    # This tests commiting from within the `resolve` operation.
+    # We need a separate test for commiting in the `restore` operation.
+    assert 'Oneline.patch' in set(working_repo.patch_repo.series)
+
+    working_repo.rollback(quiet=True)
+    with open(readme_path, 'a') as f:
+        f.write('\nOne line')
+
+    working_repo.add('README')
+    working_repo.commit("Merged 'One line' upstream")
+
+    # Fix There -> Their conflict
+    try:
+        working_repo.restore(quiet=True)
+    except ply.git.exc.PatchDidNotApplyCleanly:
+        pass
+    else:
+        raise AssertionError('Should have conflicted.')
+
+    fixed_txt = txt + ' Fin.'
+    fixed_txt = fixed_txt.replace('there', 'their')
+
+    with open(readme_path, 'w') as f:
+        f.write(fixed_txt)
+        f.write('\nOne line')
+
+    working_repo.add('README')
+
+    # Fix exclamation point patch
+    try:
+        working_repo.resolve(quiet=True)
+    except ply.git.exc.PatchDidNotApplyCleanly:
+        pass
+    else:
+        raise AssertionError('Should have conflicted.')
+
+    fixed_txt = fixed_txt.replace('country.', 'country!')
+    with open(readme_path, 'w') as f:
+        f.write(fixed_txt)
+        f.write('\nOne line')
+
+    working_repo.add('README')
+    working_repo.resolve(quiet=True)
+
+    assert 'Oneline.patch' not in set(working_repo.patch_repo.series)
+
+    # Merge upstream exact match and no conflicts so patch-repo commit needs
+    # to have been done in the restore method.
+    newfile_path = os.path.join(working_repo_path, 'newfile.txt')
+    with open(newfile_path, 'w') as f:
+        f.write('Newfile\n')
+
+    working_repo.add('newfile.txt')
+    working_repo.commit('Adding newfile.txt', quiet=True)
+    working_repo.save('HEAD^', quiet=True)
+
+    # Now rollback and merge patch upstream
+    working_repo.rollback(quiet=True)
+
+    with open(newfile_path, 'w') as f:
+        f.write('Newfile\n')
+
+    working_repo.add('newfile.txt')
+    working_repo.commit('Merging newfile.txt upstream', quiet=True)
+
+    working_repo.restore(quiet=True)
     return working_repo
 
 

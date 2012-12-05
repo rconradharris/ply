@@ -1,3 +1,4 @@
+- Use --resolvemsg when `am` fails
 - Improve output
 - Hide errors from `git am` when merge fails, we supply our own
 - Add a way to abort a restore, --abort

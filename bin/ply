@@ -56,14 +56,22 @@ def do_restore(working_repo, *args):
     --resolved: mark conflicts for a patch as resolved and continue applying
                 the rest of the patches in the series.
 
+    --skip: skips current patch and removes it from patch-repo then continues
+            by applying rest of the patches in the series.
+
     -v: verbose mode
     """
     quiet = '-v' not in args
     resolved = '--resolved' in args
+    skip = '--skip' in args
+
+    assert not(skip and resolved)
 
     try:
         if resolved:
             working_repo.resolve(quiet=quiet)
+        elif skip:
+            working_repo.skip(quiet=quiet)
         else:
             try:
                 working_repo.restore(quiet=quiet)

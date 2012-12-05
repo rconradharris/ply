@@ -13,6 +13,7 @@ def add(filename):
 def am(*patch_paths, **kwargs):
     three_way_merge = kwargs.get('three_way_merge', False)
     resolved = kwargs.get('resolved', False)
+    skip = kwargs.get('skip', False)
     quiet = kwargs.get('quiet', False)
 
     args = ['git', 'am']
@@ -24,13 +25,20 @@ def am(*patch_paths, **kwargs):
     if resolved:
         args.append('--resolved')
 
-    if quiet:
-        args.append('-q')
+    if skip:
+        args.append('--skip')
 
-    try:
-        subprocess.check_call(args)
-    except subprocess.CalledProcessError:
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    stdout, stderr = proc.communicate()
+
+    if not quiet:
+        print stdout
+
+    if proc.returncode != 0:
         raise exc.PatchDidNotApplyCleanly
+
+    if 'atch already applied' in stdout:
+        raise exc.PatchAlreadyApplied
 
 
 def checkout(branch_name, create=False, create_and_reset=False):
@@ -129,6 +137,13 @@ def reset(commit, hard=False, quiet=False):
     subprocess.check_call(args)
 
 
+def rm(filename, quiet=False):
+    args = ['git', 'rm', filename]
+    if quiet:
+        args.append('-q')
+    subprocess.check_call(args)
+
+
 class Repo(object):
     """Represent a git repo.
 
@@ -164,6 +179,6 @@ class Repo(object):
 
 
 __cmds__ = ['add', 'am', 'checkout', 'commit', 'diff_index', 'format_patch',
-            'init', 'log', 'reset']
+            'init', 'log', 'reset', 'rm']
 
 __all__ = __cmds__ + ['Repo']

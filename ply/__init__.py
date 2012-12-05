@@ -1,6 +1,12 @@
 import os
+import sys
 
 from ply import exc, git, utils
+
+
+def warn(msg, quiet=True):
+    if not quiet:
+        print >> sys.stderr, msg
 
 
 class WorkingRepo(git.Repo):
@@ -56,8 +62,8 @@ class WorkingRepo(git.Repo):
 
             os.rename(os.path.join(self.path, filename),
                       os.path.join(self.patch_repo.path, patch_name))
-            self.patch_repo.add(patch_name)
-            self.patch_repo.add_patch_to_series(patch_name)
+
+            self.patch_repo.add_patch(patch_name)
 
     def _commit_to_patch_repo(self, commit_msg, quiet=True):
         based_on = self._last_upstream_commit_hash()
@@ -98,6 +104,18 @@ class WorkingRepo(git.Repo):
         """Link a working-repo to a patch-repo."""
         os.symlink(patch_repo_path, self.patch_repo_path)
 
+    def skip(self, quiet=True):
+        """Skip applying current patch and remove from the patch-repo.
+
+        This is useful if the patch is no longer relevant because a similar
+        change was made upstream.
+        """
+        self.am(skip=True, quiet=quiet)
+        patch_name = self._teardown_conflict_file()
+
+        self.patch_repo.remove_patch(patch_name)
+        self.restore(quiet=quiet)  # Apply remaining patches
+
     def resolve(self, quiet=True):
         """Resolves a commit and refreshes the affected patch in the
         patch-repo.
@@ -108,18 +126,12 @@ class WorkingRepo(git.Repo):
         """
         self.am(resolved=True, quiet=quiet)
         patch_name = self._teardown_conflict_file()
+
         filenames = self.format_patch('HEAD^')
         self._store_patch_files([patch_name], filenames)
 
         self._add_patch_annotation(patch_name, quiet=quiet)
-
-        try:
-            self.restore()  # Apply remaining patches
-        except git.exc.PatchDidNotApplyCleanly:
-            raise
-        else:
-            # Only commit once all of the patches have been applied cleanly
-            self._commit_to_patch_repo('Refreshing patches', quiet=quiet)
+        self.restore(quiet=quiet)  # Apply remaining patches
 
     def restore(self, three_way_merge=True, quiet=True):
         """Applies a series of patches to the working repo's current branch.
@@ -147,8 +159,18 @@ class WorkingRepo(git.Repo):
                     f.write('%s\n' % patch_name)
 
                 raise
+            except git.exc.PatchAlreadyApplied:
+                self.patch_repo.remove_patch(patch_name)
+                warn("Patch '%s' appears to be upstream, removing from"
+                     " patch-repo" % patch_name, quiet=False)
 
             self._add_patch_annotation(patch_name, quiet=quiet)
+
+        # We only commit to the patch-repo when all of the patches in the
+        # series have been successfully applied. This minimize chatter in the
+        # patch-repo logs.
+        if self.patch_repo.uncommitted_changes():
+            self._commit_to_patch_repo('Refreshing patches', quiet=quiet)
 
     def rollback(self, quiet=True):
         """Rollback to that last upstream commit."""
@@ -210,11 +232,31 @@ class WorkingRepo(git.Repo):
 
 class PatchRepo(git.Repo):
     """Represents a git repo containing versioned patch files."""
-    def add_patch_to_series(self, patch_name):
+    def add_patch(self, patch_name):
+        self.add(patch_name)
+
+        # Add to series
         if patch_name not in self.series:
             with open(self.series_path, 'a') as f:
                 f.write('%s\n' % patch_name)
+
             self.add('series')
+
+    def remove_patch(self, patch_name):
+        self.rm(patch_name)
+
+        # FIXME: read-modify-write here is racey, so lockfile would be useful
+        # here.
+        with open(self.series_path) as f:
+            patch_names = f.read().strip().split('\n')
+
+        patch_names.remove(patch_name)
+
+        with open(self.series_path, 'w') as f:
+            for patch_name in patch_names:
+                f.write('%s\n' % patch_name)
+
+        self.add('series')
 
     def initialize(self, quiet=True):
         """Initialize the patch repo (create series file and git-init)."""
