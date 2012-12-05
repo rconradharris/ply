@@ -1,4 +1,3 @@
-import os
 import re
 
 RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')

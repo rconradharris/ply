@@ -6,7 +6,7 @@ from ply import exc, git, utils
 
 def warn(msg, quiet=True):
     if not quiet:
-        print >> sys.stderr, msg
+        print >> sys.stderr, 'warning: %s' % msg
 
 
 class WorkingRepo(git.Repo):
@@ -85,12 +85,16 @@ class WorkingRepo(git.Repo):
     def _patch_conflict_path(self):
         return os.path.join(self.path, '.patch-conflict')
 
-    def _teardown_conflict_file(self):
-        """Return the patch name from the temporary conflict file.
-
-        This is needed so we can add a patch-annotation after resolving a
-        conflict.
+    def _create_conflict_file(self, patch_name):
+        """The conflict-file gives us a way to memorize the patch-name of the
+        conflicting patch so that we can apply the patch-annotation after the
+        user resolves the conflict.
         """
+        with open(self._patch_conflict_path, 'w') as f:
+            f.write('%s\n' % patch_name)
+
+    def _teardown_conflict_file(self):
+        """Return the patch name from the temporary conflict file."""
         if not os.path.exists(self._patch_conflict_path):
             raise exc.PathNotFound
 
@@ -149,15 +153,22 @@ class WorkingRepo(git.Repo):
 
             patch_path = os.path.join(self.patch_repo.path, patch_name)
 
+            # Apply from mbox formatted patch, three possible outcomes here:
+            #
+            # 1. Patch applies cleanly: move on to next patch
+            #
+            # 2. Patch has conflicts: capture state, bail so user can fix
+            #    conflicts
+            #
+            # 3. Patch was already applied: remove from patch-repo, move on to
+            #    next patch
             try:
                 self.am(patch_path, three_way_merge=three_way_merge,
                         quiet=quiet)
             except git.exc.PatchDidNotApplyCleanly:
                 # Memorize the patch-name that caused the conflict so that
                 # when we later resolve it, we can add the patch-annotation
-                with open(self._patch_conflict_path, 'w') as f:
-                    f.write('%s\n' % patch_name)
-
+                self._create_conflict_file(patch_name)
                 raise
             except git.exc.PatchAlreadyApplied:
                 self.patch_repo.remove_patch(patch_name)
@@ -210,13 +221,6 @@ class WorkingRepo(git.Repo):
 
         self._store_patch_files(patch_names, filenames)
 
-        # Rollback unannotated patches (then roll-foward later)
-        #
-        # We need to do this so that the patches we just created will have
-        # patch-annotations in the working-repo history.
-        num_patches = len(list(self.patch_repo.series))
-        self.reset('HEAD~%d' % num_patches, hard=True, quiet=quiet)
-
         if len(filenames) > 1:
             commit_msg = "Adding %d patches" % len(filenames)
         else:
@@ -224,10 +228,11 @@ class WorkingRepo(git.Repo):
 
         self._commit_to_patch_repo(commit_msg, quiet=quiet)
 
-        # Hiding the output of this command because it would be confusing,
-        # it's an implementation detail that we have to rollback-and-reapply
-        # patches to put the working-repo into the proper state.
-        self.restore(quiet=True)
+        # Rollback and reapply patches so taht working repo has
+        # patch-annotations for latest saved patches
+        num_patches = len(list(self.patch_repo.series))
+        self.reset('HEAD~%d' % num_patches, hard=True, quiet=quiet)
+        self.restore(quiet=False)
 
 
 class PatchRepo(git.Repo):

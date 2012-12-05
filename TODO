@@ -1,7 +1,17 @@
-- Use --resolvemsg when `am` fails
+- Add status command:
+    - No patches applied
+    - All %d patches applied
+    - Restore in progress, use --skip and --resolved to continue
+
+- Add check command
+    Count number of patches in patch-repo and ensure it matches number of
+    lines in series file.
+
 - Improve output
 - Hide errors from `git am` when merge fails, we supply our own
+    - Use --resolvemsg when `am` fails
 - Add a way to abort a restore, --abort
+    - Abort current patch, or rollback whole series?
 
 WISHLIST
 
