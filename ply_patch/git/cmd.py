@@ -3,7 +3,7 @@ import functools
 import os
 import subprocess
 
-from ply.git import exc
+from ply_patch.git import exc
 
 
 def add(filename):
