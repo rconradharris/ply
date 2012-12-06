@@ -1,2 +1,6 @@
 *.swp
 *.pyc
+dist/
+nova_sandbox/
+ply_patch.egg-info/
+sandbox/
