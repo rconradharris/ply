@@ -1,9 +1,12 @@
 import setuptools
 
 
+execfile('plypatch/version.py')
+
+
 setuptools.setup(
     name='plypatch',
-    version='0.2.2',
+    version=__version__,
     description='Ply: Git-based Patch Management',
     url='https://github.com/rconradharris/ply',
     license='MIT',

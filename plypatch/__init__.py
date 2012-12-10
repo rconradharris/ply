@@ -1,7 +1,10 @@
 import os
 import sys
 
-from plypatch import exc, git, utils
+from plypatch import exc, git, utils, version
+
+
+__version__ = version.__version__
 
 
 def warn(msg, quiet=True):

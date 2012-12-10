@@ -14,7 +14,7 @@ def die(msg):
 def usage():
     cmds = [x.replace('do_', '')
             for x in globals().keys() if x.startswith('do_')]
-    die("usage: ply <%s>" % '|'.join(sorted(cmds)))
+    die("usage: ply [--version] <%s>" % '|'.join(sorted(cmds)))
 
 
 def die_on_conflicts():
@@ -182,6 +182,10 @@ def do_status(working_repo, *args):
 def main():
     if len(sys.argv) < 2:
         usage()
+
+    if '--version' in sys.argv[1:]:
+        print plypatch.__version__
+        return
 
     cmd = sys.argv[1]
     func = globals().get('do_%s' % cmd)
