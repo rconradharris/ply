@@ -58,13 +58,13 @@ Usage
 
 * Resolve a failed merge and continue applying `patch-series`::
 
-    ply restore --resolved
+    ply resolve
 
 * Skip a patch that has already merged upstream. In addition to performing a
   ``git am --skip``, this will also remove the relevant patch from the
   `patch-repo`::
 
-        ply restore --skip
+        ply skip
 
    Note: If the upstream patch is an exact match of the version in the
    patch-repo, ``ply`` will automatically remove the patch from the patch-repo.

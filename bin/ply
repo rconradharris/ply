@@ -22,7 +22,7 @@ def die_on_conflicts():
     print
     print "\t1) Fix conflicts in affected files"
     print "\n\t2) `git add` affected files"
-    print "\n\t3) Run `ply restore --resolved` to refresh the patch and"\
+    print "\n\t3) Run `ply resolve` to refresh the patch and"\
           " apply the rest\n\t   of the patches in the series."
     sys.exit(1)
 
@@ -70,33 +70,29 @@ def do_link(working_repo, *args):
     working_repo.link(patch_repo_path)
 
 
-def do_restore(working_repo, *args):
-    """Apply the patch series to the the current branch of the working-repo.
-
-    --resolved: mark conflicts for a patch as resolved and continue applying
-                the rest of the patches in the series.
-
-    --skip: skips current patch and removes it from patch-repo then continues
-            by applying rest of the patches in the series.
+def do_resolve(working_repo, *args):
+    """Mark conflicts for a patch as resolved and continue applying the rest
+    of the patches in the series.
 
     -v: verbose mode
     """
     quiet = '-v' not in args
-    resolved = '--resolved' in args
-    skip = '--skip' in args
-
-    assert not(skip and resolved)
-
     try:
-        if resolved:
-            working_repo.resolve(quiet=quiet)
-        elif skip:
-            working_repo.skip(quiet=quiet)
-        else:
-            try:
-                working_repo.restore(quiet=quiet)
-            except ply_patch.exc.UncommittedChanges:
-                die_on_uncommitted_changes()
+        working_repo.resolve(quiet=quiet)
+    except ply_patch.git.exc.PatchDidNotApplyCleanly:
+        die_on_conflicts()
+
+
+def do_restore(working_repo, *args):
+    """Apply the patch series to the the current branch of the working-repo.
+
+    -v: verbose mode
+    """
+    quiet = '-v' not in args
+    try:
+        working_repo.restore(quiet=quiet)
+    except ply_patch.exc.UncommittedChanges:
+        die_on_uncommitted_changes()
     except ply_patch.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
@@ -149,12 +145,25 @@ def do_save(working_repo, *args):
         die_on_uncommitted_changes()
 
 
+def do_skip(working_repo, *args):
+    """Skips current patch and removes it from patch-repo then continues by
+    applying rest of the patches in the series.
+
+    -v: verbose mode
+    """
+    quiet = '-v' not in args
+    try:
+        working_repo.skip(quiet=quiet)
+    except ply_patch.git.exc.PatchDidNotApplyCleanly:
+        die_on_conflicts()
+
+
 def do_status(working_repo, *args):
     """Show status of the working-repo."""
     status = working_repo.status
 
     if status == 'restore-in-progress':
-        die('Restore in progress, use --skip and --resolved to continue')
+        die('Restore in progress, use skip or resolve to continue')
     elif status == 'no-patches-applied':
         die('No patches applied')
     else:

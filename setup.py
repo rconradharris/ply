@@ -3,7 +3,7 @@ import setuptools
 
 setuptools.setup(
     name='ply_patch',
-    version='0.2',
+    version='0.2.1',
     description='Ply: Git-based Patch Management',
     url='https://github.com/rconradharris/ply',
     license='MIT',
