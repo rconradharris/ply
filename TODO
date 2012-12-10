@@ -2,8 +2,6 @@
 - Improve output
 - Hide errors from `git am` when merge fails, we supply our own
     - Use --resolvemsg when `am` fails
-- Add a way to abort a restore, --abort
-    - Abort current patch, or rollback whole series?
 
 WISHLIST
 

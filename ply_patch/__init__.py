@@ -107,6 +107,26 @@ class WorkingRepo(git.Repo):
         os.unlink(self._patch_conflict_path)
         return patch_name
 
+    def _resolve_conflict(self, method, quiet=True):
+        """Resolve a conflict using one of the following methods:
+
+            1. Abort
+            2. Skip
+            3. Resolve
+        """
+        kwargs = {method: True, 'quiet': quiet}
+        self.am(**kwargs)
+        return self._teardown_conflict_file()
+
+    def abort(self, quiet=True):
+        """Abort a failed merge.
+
+        NOTE: this doesn't rollback commits that have successfully applied.
+        """
+        self._resolve_conflict('abort', quiet=quiet)
+        # Throw away any conflict resolution changes
+        self.reset('HEAD', hard=True, quiet=quiet)
+
     def link(self, patch_repo_path):
         """Link a working-repo to a patch-repo."""
         os.symlink(patch_repo_path, self.patch_repo_path)
@@ -117,8 +137,7 @@ class WorkingRepo(git.Repo):
         This is useful if the patch is no longer relevant because a similar
         change was made upstream.
         """
-        self.am(skip=True, quiet=quiet)
-        patch_name = self._teardown_conflict_file()
+        patch_name = self._resolve_conflict('skip', quiet=quiet)
 
         self.patch_repo.remove_patch(patch_name)
         self.restore(quiet=quiet)  # Apply remaining patches
@@ -131,8 +150,7 @@ class WorkingRepo(git.Repo):
         patch, which would make for a rather chatty history, we instead commit
         one time after all of the patches have been applied.
         """
-        self.am(resolved=True, quiet=quiet)
-        patch_name = self._teardown_conflict_file()
+        patch_name = self._resolve_conflict('resolved', quiet=quiet)
 
         filenames = self.format_patch('HEAD^')
         self._store_patch_files([patch_name], filenames)

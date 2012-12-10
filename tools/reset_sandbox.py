@@ -15,9 +15,14 @@ def _create_patch_repo(patch_repo_path):
     return patch_repo
 
 
-def _assert_text(readme_path, expected):
+def _assert_text_exact_match(readme_path, expected):
     with open(readme_path) as f:
         assert f.read() == expected
+
+
+def _assert_text_substring_match(readme_path, expected):
+    with open(readme_path) as f:
+        assert expected in f.read()
 
 
 def _create_working_repo(working_repo_path, patch_repo):
@@ -39,8 +44,9 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.add('README')
     working_repo.commit('Adding README', quiet=True)
 
-    _assert_text(readme_path, 'Now is the time for all good men to come to'
-                              ' the aid of there country.')
+    _assert_text_exact_match(readme_path,
+            'Now is the time for all good men to come to'
+            ' the aid of there country.')
 
     us_hash = working_repo._last_upstream_commit_hash()
 
@@ -93,8 +99,9 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.resolve()
 
-    _assert_text(readme_path, 'Now is the time for all good men to come to'
-                              ' the aid of their country! Fin.')
+    _assert_text_exact_match(readme_path,
+            'Now is the time for all good men to come to'
+            ' the aid of their country! Fin.')
 
     # Add additional line
     with open(readme_path, 'a') as f:
@@ -211,6 +218,30 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     os.unlink(bogus_patch_path)
     assert working_repo.patch_repo.check() == ('ok', {})
+
+    # Test abort
+    working_repo.rollback()
+    with open(readme_path, 'w') as f:
+        f.write('')  # Clear README
+
+    working_repo.add('README')
+    working_repo.commit("Clearing README file")
+
+    _assert_text_exact_match(readme_path, '')
+
+    try:
+        working_repo.restore(quiet=True)
+    except ply_patch.git.exc.PatchDidNotApplyCleanly:
+        pass
+    else:
+        raise AssertionError('Should have conflicted.')
+
+    working_repo.abort(quiet=True)
+    _assert_text_exact_match(readme_path, '')
+
+    # Restore the README since th test passed
+    working_repo.reset('HEAD^', hard=True)
+    _assert_text_substring_match(readme_path, 'Now is the time')
 
     return working_repo
 

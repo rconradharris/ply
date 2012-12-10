@@ -12,6 +12,7 @@ def add(filename):
 
 def am(*patch_paths, **kwargs):
     three_way_merge = kwargs.get('three_way_merge', False)
+    abort = kwargs.get('abort', False)
     resolved = kwargs.get('resolved', False)
     skip = kwargs.get('skip', False)
     quiet = kwargs.get('quiet', False)
@@ -27,6 +28,9 @@ def am(*patch_paths, **kwargs):
 
     if skip:
         args.append('--skip')
+
+    if abort:
+        args.append('--abort')
 
     proc = subprocess.Popen(args, stdout=subprocess.PIPE)
     stdout, stderr = proc.communicate()

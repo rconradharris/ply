@@ -31,6 +31,15 @@ def die_on_uncommitted_changes():
     die('ERROR: Uncommitted changes, commit or discard before continuing.')
 
 
+def do_abort(working_repo, *args):
+    """Abort in-progress restore operation.
+
+    -v: verbose mode
+    """
+    quiet = '-v' not in args
+    working_repo.abort(quiet=quiet)
+
+
 def do_check(working_repo, *args):
     """Peform a health check on the patch-repo."""
     status, errors = working_repo.check_patch_repo()
