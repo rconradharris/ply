@@ -2,7 +2,7 @@ import setuptools
 
 
 setuptools.setup(
-    name='ply_patch',
+    name='plypatch',
     version='0.2.2',
     description='Ply: Git-based Patch Management',
     url='https://github.com/rconradharris/ply',

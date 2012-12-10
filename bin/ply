@@ -2,8 +2,8 @@
 import os
 import sys
 
-import ply_patch
-from ply_patch import git
+import plypatch
+from plypatch import git
 
 
 def die(msg):
@@ -66,7 +66,7 @@ def do_init(_, *args):
         die("ply init <patch-repo-path>")
 
     patch_repo_path = args[0]
-    patch_repo = ply_patch.PatchRepo(patch_repo_path)
+    patch_repo = plypatch.PatchRepo(patch_repo_path)
     patch_repo.initialize()
 
 
@@ -88,7 +88,7 @@ def do_resolve(working_repo, *args):
     quiet = '-v' not in args
     try:
         working_repo.resolve(quiet=quiet)
-    except ply_patch.git.exc.PatchDidNotApplyCleanly:
+    except plypatch.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
 
@@ -100,9 +100,9 @@ def do_restore(working_repo, *args):
     quiet = '-v' not in args
     try:
         working_repo.restore(quiet=quiet)
-    except ply_patch.exc.UncommittedChanges:
+    except plypatch.exc.UncommittedChanges:
         die_on_uncommitted_changes()
-    except ply_patch.git.exc.PatchDidNotApplyCleanly:
+    except plypatch.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
 
@@ -116,7 +116,7 @@ def do_rollback(working_repo, *args):
     quiet = '-v' not in args
     try:
         working_repo.rollback(quiet=quiet)
-    except ply_patch.exc.UncommittedChanges:
+    except plypatch.exc.UncommittedChanges:
         die_on_uncommitted_changes()
 
 
@@ -150,7 +150,7 @@ def do_save(working_repo, *args):
 
     try:
         working_repo.save(since, prefix=prefix, quiet=quiet)
-    except ply_patch.exc.UncommittedChanges:
+    except plypatch.exc.UncommittedChanges:
         die_on_uncommitted_changes()
 
 
@@ -163,7 +163,7 @@ def do_skip(working_repo, *args):
     quiet = '-v' not in args
     try:
         working_repo.skip(quiet=quiet)
-    except ply_patch.git.exc.PatchDidNotApplyCleanly:
+    except plypatch.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
 
@@ -186,7 +186,7 @@ def main():
     cmd = sys.argv[1]
     func = globals().get('do_%s' % cmd)
     if func:
-        working_repo = ply_patch.WorkingRepo('.')
+        working_repo = plypatch.WorkingRepo('.')
         func(working_repo, *sys.argv[2:])
     else:
         die("command '%s' not found" % cmd)

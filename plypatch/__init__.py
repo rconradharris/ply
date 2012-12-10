@@ -1,7 +1,7 @@
 import os
 import sys
 
-from ply_patch import exc, git, utils
+from plypatch import exc, git, utils
 
 
 def warn(msg, quiet=True):
