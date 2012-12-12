@@ -349,13 +349,24 @@ class PatchRepo(git.Repo):
     def series_path(self):
         return os.path.join(self.path, 'series')
 
-    @property
-    def series(self):
-        entries = []
-
-        with open(self.series_path, 'r') as f:
+    def _recursive_series(self, series_path):
+        """Emit patch_names from series file, handling -i recursion."""
+        with open(series_path, 'r') as f:
             for line in f:
                 patch_name = line.strip()
-                entries.append(patch_name)
+                if patch_name.startswith('-i '):
+                    # If entry starts with -i, what follows is a path to a
+                    # child series file
+                    series_rel_path = patch_name.split(' ', 1)[1].strip()
+                    child_series_path = os.path.join(
+                            self.path, series_rel_path)
+                    patch_dir = os.path.dirname(series_rel_path)
+                    for child_patch_name in self._recursive_series(
+                            child_series_path):
+                        yield os.path.join(patch_dir, child_patch_name)
+                else:
+                    yield patch_name
 
-        return entries
+    @property
+    def series(self):
+        return list(self._recursive_series(self.series_path))
