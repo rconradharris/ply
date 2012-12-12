@@ -114,7 +114,7 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.rollback(quiet=True)
     working_repo.restore(quiet=True)
 
-    # Make uncommitted unchange
+    # Make uncommitted change in working repo
     with open(readme_path, 'a') as f:
         f.write('Uncommitted change')
 
@@ -125,9 +125,25 @@ def _create_working_repo(working_repo_path, patch_repo):
         pass
     else:
         raise AssertionError('Restore should have failed due to uncommitted'
-                              ' changes.')
+                              ' changes in working repo.')
 
     working_repo.reset('HEAD', hard=True)
+
+    # Make uncommitted change in patch repo
+    series_path = os.path.join(working_repo.patch_repo.path, 'series')
+    with open(series_path, 'a') as f:
+        f.write('Uncommitted change')
+
+    # Ensure uncommitted change is raised
+    try:
+        working_repo.save('HEAD^', quiet=True)
+    except plypatch.exc.UncommittedChanges:
+        pass
+    else:
+        raise AssertionError('Restore should have failed due to uncommitted'
+                              ' changes in patch repo.')
+
+    patch_repo.reset('HEAD', hard=True)
 
     # Merge 'One line' change upstream.
     # This tests commiting from within the `resolve` operation.

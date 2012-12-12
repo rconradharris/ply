@@ -217,7 +217,7 @@ class WorkingRepo(git.Repo):
 
     def save(self, since, prefix=None, quiet=True):
         """Save a series of commits as patches into the patch-repo."""
-        if self.uncommitted_changes():
+        if self.uncommitted_changes() or self.patch_repo.uncommitted_changes():
             raise exc.UncommittedChanges
 
         if '..' in since:

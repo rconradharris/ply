@@ -1,8 +1,17 @@
-- Make _applied_patches return a list, generator is a hassle
-- Improve output
 - Hide errors from `git am` when merge fails, we supply our own
     - Use --resolvemsg when `am` fails
+- Allow for recursive series files like pip-requires:
+
+  -r mysubdir/series
+
+  or just subdir with `series` implied:
+
+  mysubdir/
+- Make _applied_patches return a list, generator is a hassle
 
 WISHLIST
 
 - Use argparse in bin/ply
+- ply graph - generate DOT file graph on dependencies
+- Show which patches are being applied in reqular mode. (-q to supress, -v for
+  even more info)
