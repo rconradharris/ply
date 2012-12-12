@@ -1,3 +1,4 @@
+import collections
 import os
 import sys
 
@@ -370,3 +371,72 @@ class PatchRepo(git.Repo):
     @property
     def series(self):
         return list(self._recursive_series(self.series_path))
+
+    def _changed_files_for_patch(self, patch_name):
+        """Returns a set of files that were modified by specified patch."""
+        changed_files = set()
+        patch_path = os.path.join(self.path, patch_name)
+        with open(patch_path) as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith('--- a/'):
+                    line = line.replace('--- a/', '')
+                elif line.startswith('+++ b/'):
+                    line = line.replace('+++ b/', '')
+                else:
+                    continue
+                filename = line
+                if filename.startswith('/dev/null'):
+                    continue
+                changed_files.add(filename)
+
+        return changed_files
+
+    def _changes_by_filename(self):
+        """Return a breakdown of what patches modifiied a given file over the
+        whole patch series.
+
+        {filename: [patch1, patch2, ...]}
+        """
+        file_changes = collections.defaultdict(list)
+        for patch_name in self.series:
+            changed_files = self._changed_files_for_patch(patch_name)
+            for filename in changed_files:
+                file_changes[filename].append(patch_name)
+
+        return file_changes
+
+    def patch_dependencies(self):
+        """Returns a graph representing the file-dependencies between patches.
+
+        To retiterate, this is not a call-graph representing
+        code-dependencies, this is a graph representing how files change
+        between patches, useful in breaking up a large patch set into smaller,
+        independent patch sets.
+
+        The graph uses patch_names as nodes with directed edges representing
+        files that both patches modify. In Python:
+
+            {(dependent, parent): set(file_both_touch1, file_both_touch2, ...)}
+        """
+        graph = collections.defaultdict(set)
+        for filename, patch_names in self._changes_by_filename().iteritems():
+            parent = None
+            for dependent in patch_names:
+                if parent:
+                    graph[(dependent, parent)].add(filename)
+                parent = dependent
+        return graph
+
+    def patch_dependency_dot_graph(self):
+        """Return a DOT version of the dependency graph."""
+        lines = ['digraph patchdeps {']
+
+        for (dependent, parent), changed_files in\
+                self.patch_dependencies().iteritems():
+            label = ', '.join(sorted(changed_files))
+            lines.append('"%s" -> "%s" [label="%s"];' % (
+                dependent, parent, label))
+
+        lines.append('}')
+        return '\n'.join(lines)

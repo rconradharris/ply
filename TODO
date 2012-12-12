@@ -5,6 +5,5 @@
 WISHLIST
 
 - Use argparse in bin/ply
-- ply graph - generate DOT file graph on dependencies
 - Show which patches are being applied in reqular mode. (-q to supress, -v for
   even more info)

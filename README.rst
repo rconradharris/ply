@@ -75,6 +75,14 @@ Usage
     ply check
     OK
 
+* Create a `DOT graph<http://en.wikipedia.org/wiki/DOT_language>`_
+  representation of patch dependencies::
+
+        ply graph
+
+  The output of this can be piped into ``dot`` to generate a PNG file::
+
+        ply graph | dot -Tpng > dependencies.png
 
 `ply` vs X?
 ===========
@@ -88,9 +96,9 @@ version-control. This orthogonality, in some respect, is elegant, but is a
 hassle in day-to-day use. Why checkpoint files in ``quilt`` when your version
 control system already does that for you?
 
-``stgit`` (stacked-git) understands version control but stores patches as commit
-objects, not as patch files. This means you can't version your patches, making
-it impossible to rollback when things go awry.
+``stgit`` (stacked-git) understands version control but stores patches as
+commit objects, not as patch files. This means you can't version your patches,
+making it impossible to rollback when things go awry.
 
 ``ply`` blends these two tools together to create a tool that understands
 version-control but at the same time stores patches as files which can

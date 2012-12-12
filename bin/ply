@@ -60,6 +60,14 @@ def do_check(working_repo, *args):
             print '\t- %s' % patch_name
 
 
+def do_graph(working_repo, *args):
+    """Graph patch dependencies.
+
+    Print a DOT file to stdout.
+    """
+    print working_repo.patch_repo.patch_dependency_dot_graph()
+
+
 def do_init(_, *args):
     """Initialize a new patch-repo."""
     if not args:
