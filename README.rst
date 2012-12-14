@@ -32,9 +32,13 @@ Usage
 
     ply init .
 
-* Link a `working-repo` to a patch repo::
+* Link `working-repo` to a `patch-repo`::
 
     ply link ../my-patch-repo  # from within the working-repo
+
+* Unlink `working-repo` from current `patch-repo`::
+
+    ply unlink
 
 * Check that status of a `working-repo`::
 
@@ -67,15 +71,16 @@ Usage
         ply skip
 
    Note: If the upstream patch is an exact match of the version in the
-   patch-repo, ``ply`` will automatically remove the patch from the patch-repo.
+   `patch-repo`, ``ply`` will automatically remove the patch from the
+   `patch-repo`.
 
-* Perform a health-check on the patch-repo. This ensures that all of the
-  patches in the patch-repo are accounted for in the `patch-series`::
+* Perform a health-check on the `patch-repo`. This ensures that all of the
+  patches in the `patch-repo` are accounted for in the `patch-series`::
 
     ply check
     OK
 
-* Create a `DOT graph<http://en.wikipedia.org/wiki/DOT_language>`_
+* Create a `DOT graph <http://en.wikipedia.org/wiki/DOT_language>`_
   representation of patch dependencies::
 
         ply graph

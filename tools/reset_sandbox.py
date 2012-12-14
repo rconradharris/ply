@@ -33,6 +33,30 @@ def _create_working_repo(working_repo_path, patch_repo):
     # Link to patch repo
     working_repo.link(patch_repo.path)
 
+    # Make sure we can't link twice (since this would add two configs for the
+    # same key)
+    try:
+        working_repo.link(patch_repo.path)
+    except plypatch.exc.AlreadyLinkedToPatchRepo:
+        pass
+    else:
+        raise AssertionError('Should raise AlreadyLinkedToPatchRepo')
+
+    # Test patch-repo unlink
+    working_repo.unlink()
+    assert working_repo.patch_repo_path is None
+
+    # Can't unlink twice
+    try:
+        working_repo.unlink()
+    except plypatch.exc.NoLinkedPatchRepo:
+        pass
+    else:
+        raise AssertionError('Should raise NoLinkedPatchRepo')
+
+    # Re-link so we can continue with tests...
+    working_repo.link(patch_repo.path)
+
     # Create Typo
     readme_path = os.path.join(working_repo_path, 'README')
     txt = 'Now is the time for all good men to come to the aid of there'\

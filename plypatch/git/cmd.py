@@ -82,6 +82,28 @@ def commit(msg, all=False, amend=False, use_commit_object=None, quiet=False):
     subprocess.check_call(args)
 
 
+def config(cmd, config_key=None, config_value=None):
+    """Add/unset git configs"""
+    args = ['git', 'config']
+
+    if cmd == 'add':
+        assert config_key and config_value
+        args.extend(['--add', config_key, config_value])
+    elif cmd == 'get':
+        args.extend(['--get', config_key])
+    elif cmd == 'unset':
+        args.extend(['--unset', config_key])
+    else:
+        raise ValueError('unknown command %s' % cmd)
+
+    proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+    stdout, stderr = proc.communicate()
+    if proc.returncode != 0:
+        raise exc.GitException((proc.returncode, stdout, stderr))
+    lines = [line.strip() for line in stdout.split('\n') if line]
+    return lines
+
+
 def diff_index(treeish, name_only=False):
     """git diff-index --name-only HEAD --"""
     args = ['git', 'diff-index', treeish]
@@ -182,7 +204,7 @@ class Repo(object):
         return len(self.diff_index('HEAD')) != 0
 
 
-__cmds__ = ['add', 'am', 'checkout', 'commit', 'diff_index', 'format_patch',
-            'init', 'log', 'reset', 'rm']
+__cmds__ = ['add', 'am', 'checkout', 'commit', 'config', 'diff_index',
+            'format_patch', 'init', 'log', 'reset', 'rm']
 
 __all__ = __cmds__ + ['Repo']

@@ -76,13 +76,20 @@ class WorkingRepo(git.Repo):
 
     @property
     def patch_repo_path(self):
-        return os.path.join(self.path, '.patch_repo')
+        try:
+            path = self.config('get', config_key='ply.patchrepo')[0]
+        except git.exc.GitException:
+            path = None
+        return path
 
     @property
     def patch_repo(self):
         """Return a patch repo object associated with this working repo via
-        the `.patch_repo` symlink.
+        the ply.patchrepo git config.
         """
+        if not self.patch_repo_path:
+            raise exc.NoLinkedPatchRepo
+
         return PatchRepo(self.patch_repo_path)
 
     @property
@@ -133,7 +140,18 @@ class WorkingRepo(git.Repo):
 
     def link(self, patch_repo_path):
         """Link a working-repo to a patch-repo."""
-        os.symlink(patch_repo_path, self.patch_repo_path)
+        if self.patch_repo_path:
+            raise exc.AlreadyLinkedToPatchRepo
+
+        self.config('add', config_key='ply.patchrepo',
+                    config_value=patch_repo_path)
+
+    def unlink(self):
+        """Unlink a working-repo from a patch-repo."""
+        if not self.patch_repo_path:
+            raise exc.NoLinkedPatchRepo
+
+        self.config('unset', config_key='ply.patchrepo')
 
     def skip(self, quiet=True):
         """Skip applying current patch and remove from the patch-repo.
@@ -360,7 +378,7 @@ class PatchRepo(git.Repo):
                     # child series file
                     series_rel_path = patch_name.split(' ', 1)[1].strip()
                     child_series_path = os.path.join(
-                            self.path, series_rel_path)
+                        self.path, series_rel_path)
                     patch_dir = os.path.dirname(series_rel_path)
                     for child_patch_name in self._recursive_series(
                             child_series_path):

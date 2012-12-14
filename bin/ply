@@ -84,7 +84,10 @@ def do_link(working_repo, *args):
         die("ply link <patch-repo-path>")
 
     patch_repo_path = args[0]
-    working_repo.link(patch_repo_path)
+    try:
+        working_repo.link(patch_repo_path)
+    except plypatch.exc.AlreadyLinkedToPatchRepo:
+        die('Already linked to a patch-repo')
 
 
 def do_resolve(working_repo, *args):
@@ -185,6 +188,14 @@ def do_status(working_repo, *args):
         die('No patches applied')
     else:
         die('All patches applied')
+
+
+def do_unlink(working_repo, *args):
+    """Unlink a working repo from a patch repo."""
+    try:
+        working_repo.unlink()
+    except plypatch.exc.NoLinkedPatchRepo:
+        die('Not linked to a patch-repo')
 
 
 def main():
