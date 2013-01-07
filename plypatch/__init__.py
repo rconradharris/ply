@@ -1,4 +1,5 @@
 import collections
+import contextlib
 import os
 import sys
 
@@ -55,7 +56,8 @@ class WorkingRepo(git.Repo):
                 break
             yield patch_name
 
-    def _store_patch_files(self, patch_names, filenames):
+    def _store_patch_files(self, patch_names, filenames,
+                           parent_patch_name=None):
         """Store a set of patch files in the patch-repo."""
         for patch_name, filename in zip(patch_names, filenames):
             # Ensure destination exists (in case a prefix was supplied)
@@ -67,7 +69,8 @@ class WorkingRepo(git.Repo):
             os.rename(os.path.join(self.path, filename),
                       os.path.join(self.patch_repo.path, patch_name))
 
-            self.patch_repo.add_patch(patch_name)
+        self.patch_repo.add_patches(
+                patch_names, parent_patch_name=parent_patch_name)
 
     def _commit_to_patch_repo(self, commit_msg, quiet=True):
         based_on = self._last_upstream_commit_hash()
@@ -174,8 +177,10 @@ class WorkingRepo(git.Repo):
         """
         patch_name = self._resolve_conflict('resolved', quiet=quiet)
 
-        filenames = self.format_patch('HEAD^')
-        self._store_patch_files([patch_name], filenames)
+        filenames, parent_patch_name = self._create_patches('HEAD^')
+
+        self._store_patch_files([patch_name], filenames,
+                                parent_patch_name=parent_patch_name)
 
         self._add_patch_annotation(patch_name, quiet=quiet)
         self.restore(quiet=quiet)  # Apply remaining patches
@@ -234,6 +239,12 @@ class WorkingRepo(git.Repo):
         based_on = self._last_upstream_commit_hash()
         self.reset(based_on, hard=True, quiet=quiet)
 
+    def _create_patches(self, since):
+        filenames = self.format_patch(since)
+        commit_msg = self.log(since, pretty='%B', count=1)
+        parent_patch_name = utils.get_patch_annotation(commit_msg)
+        return filenames, parent_patch_name
+
     def save(self, since, prefix=None, quiet=True):
         """Save a series of commits as patches into the patch-repo."""
         if self.uncommitted_changes() or self.patch_repo.uncommitted_changes():
@@ -242,7 +253,7 @@ class WorkingRepo(git.Repo):
         if '..' in since:
             raise ValueError(".. not supported at the moment")
 
-        filenames = self.format_patch(since)
+        filenames, parent_patch_name = self._create_patches(since)
 
         patch_names = []
         for filename in filenames:
@@ -262,7 +273,8 @@ class WorkingRepo(git.Repo):
 
             patch_names.append(patch_name)
 
-        self._store_patch_files(patch_names, filenames)
+        self._store_patch_files(patch_names, filenames,
+                                parent_patch_name=parent_patch_name)
 
         if len(filenames) > 1:
             commit_msg = "Adding %d patches" % len(filenames)
@@ -327,31 +339,61 @@ class PatchRepo(git.Repo):
             patch_names.append(path.replace(strip, ''))
         return patch_names
 
-    def add_patch(self, patch_name):
-        self.add(patch_name)
-
-        # Add to series
-        if patch_name not in self.series:
-            with open(self.series_path, 'a') as f:
-                f.write('%s\n' % patch_name)
-
-            self.add('series')
-
-    def remove_patch(self, patch_name):
-        self.rm(patch_name)
-
-        # FIXME: read-modify-write here is racey, so lockfile would be useful
-        # here.
+    @contextlib.contextmanager
+    def _mutate_series_file(self):
+        """The series file is effectively a list of patches to apply in order.
+        This function allows you to add/remove/reorder the patches in the
+        series-file by manipulating a plain-old Python list.
+        """
+        # Read in series file and create list
+        patch_names = []
         with open(self.series_path) as f:
-            patch_names = f.read().strip().split('\n')
+            for line in f:
+                line = line.strip()
 
-        patch_names.remove(patch_name)
+                if not line:
+                    continue
 
+                patch_names.append(line)
+
+        # Allow caller to mutate it
+        yield patch_names
+
+        # Write back new contents
         with open(self.series_path, 'w') as f:
             for patch_name in patch_names:
                 f.write('%s\n' % patch_name)
 
         self.add('series')
+
+    def add_patches(self, patch_names, parent_patch_name=None):
+        """Add patches to the patch-repo, including add them to the series
+        file in the appropriate location.
+
+
+        `parent_patch_name` represents where in the `series` file we should
+        insert the new patch set.
+
+        `None` indicates that the patch-set doesn't have a parent so it should
+        be inserted at the beginning of the series file.
+        """
+        with self._mutate_series_file() as entries:
+            if parent_patch_name:
+                base = entries.index(parent_patch_name) + 1
+            else:
+                base = 0
+
+            for idx, patch_name in enumerate(patch_names):
+                self.add(patch_name)
+
+                if patch_name not in entries:
+                    entries.insert(base + idx, patch_name)
+
+    def remove_patch(self, patch_name):
+        self.rm(patch_name)
+
+        with self._mutate_series_file() as entries:
+            entries.remove(patch_name)
 
     def initialize(self, quiet=True):
         """Initialize the patch repo (create series file and git-init)."""

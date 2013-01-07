@@ -1,6 +1,6 @@
 import unittest
 
-from ply import utils
+from plypatch import utils
 
 
 NOT_PRESENT = 'New Feature'

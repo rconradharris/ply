@@ -1,3 +1,8 @@
+0.2.6
+  - Add patches can now insert patches into arbitrary locations in the series
+    file instead of just appending.
+  - Fix patch ordering issue caused by only supporting append to the series
+    file.
 0.2.5
   - Using `ply.patchrepo` git config instead of symlink to connect
     working-repo to patch-repo
