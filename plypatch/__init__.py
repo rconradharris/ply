@@ -132,6 +132,8 @@ class WorkingRepo(git.Repo):
         NOTE: this doesn't rollback commits that have successfully applied.
         """
         self._resolve_conflict('abort', quiet=quiet)
+        os.unlink(self._restore_stats_path)
+
         # Throw away any conflict resolution changes
         self.reset('HEAD', hard=True, quiet=quiet)
 
@@ -179,6 +181,10 @@ class WorkingRepo(git.Repo):
         self._add_patch_annotation(patch_name, quiet=quiet)
         self.restore(quiet=quiet)  # Apply remaining patches
 
+    @property
+    def _restore_stats_path(self):
+        return os.path.join(self.path, '.restore-stats')
+
     def _update_restore_stats(self, delta_updated=0, delta_removed=0):
         """Restore-Stats allows us to craft a more useful commit message,
         containing the number of patches updated and removed during a restore.
@@ -193,21 +199,21 @@ class WorkingRepo(git.Repo):
         """
         updated, removed = 0, 0
 
-        if os.path.exists('.plyrestorestats'):
-            with open('.plyrestorestats', 'r') as f:
+        if os.path.exists(self._restore_stats_path):
+            with open(self._restore_stats_path, 'r') as f:
                 updated, removed = map(int, f.read().strip().split(' '))
 
         updated += delta_updated
         removed += delta_removed
 
-        with open('.plyrestorestats', 'w') as f:
+        with open(self._restore_stats_path, 'w') as f:
             f.write('%d %d\n' % (updated, removed))
 
     def _get_and_clear_restore_stats(self):
-        with open('.plyrestorestats', 'r') as f:
+        with open(self._restore_stats_path, 'r') as f:
             updated, removed = map(int, f.read().strip().split(' '))
 
-        os.unlink('.plyrestorestats')
+        os.unlink(self._restore_stats_path)
         return updated, removed
 
     def restore(self, three_way_merge=True, quiet=True):

@@ -277,6 +277,7 @@ def _create_working_repo(working_repo_path, patch_repo):
         raise AssertionError('Should have conflicted.')
 
     working_repo.abort(quiet=True)
+    assert not os.path.exists(working_repo._restore_stats_path)
     _assert_text_exact_match(readme_path, '')
 
     # Restore the README since th test passed

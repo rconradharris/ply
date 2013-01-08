@@ -1,4 +1,3 @@
-- BUG: Abort should also remove .plyrestorestats file
 - BUG: On save, only generate commit if there are actual changes in the patch-repo
   (updated will still be incremented even if no change since a file was copied
   over)
