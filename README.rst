@@ -21,7 +21,8 @@ you'll do most of your work: you'll make changes, commit them, and then run
 ``ply save`` to create a new set of patches, called a `patch-series`.
 
 The patches are stored in the `patch-repo` (PR), a separate ``git`` repo
-that is linked to the `working-repo` by way of a symlink.
+that is linked to the `working-repo` using the ``ply.patchrepo`` ``git``
+config.
 
 
 Usage
@@ -70,9 +71,9 @@ Usage
 
         ply skip
 
-   Note: If the upstream patch is an exact match of the version in the
-   `patch-repo`, ``ply`` will automatically remove the patch from the
-   `patch-repo`.
+  Note: If the upstream patch is an exact match of the version in the
+  `patch-repo`, ``ply`` will automatically remove the patch from the
+  `patch-repo`.
 
 * Perform a health-check on the `patch-repo`. This ensures that all of the
   patches in the `patch-repo` are accounted for in the `patch-series`::

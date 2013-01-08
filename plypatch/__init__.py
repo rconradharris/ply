@@ -69,7 +69,7 @@ class WorkingRepo(git.Repo):
             os.rename(os.path.join(self.path, filename),
                       os.path.join(self.patch_repo.path, patch_name))
 
-        self.patch_repo.add_patches(
+        return self.patch_repo.add_patches(
                 patch_names, parent_patch_name=parent_patch_name)
 
     def _commit_to_patch_repo(self, commit_msg, quiet=True):
@@ -164,7 +164,7 @@ class WorkingRepo(git.Repo):
         """
         patch_name = self._resolve_conflict('skip', quiet=quiet)
 
-        self.patch_repo.remove_patch(patch_name)
+        self.patch_repo.remove_patches([patch_name])
         self.restore(quiet=quiet)  # Apply remaining patches
 
     def resolve(self, quiet=True):
@@ -184,6 +184,37 @@ class WorkingRepo(git.Repo):
 
         self._add_patch_annotation(patch_name, quiet=quiet)
         self.restore(quiet=quiet)  # Apply remaining patches
+
+    def _update_restore_stats(self, delta_updated=0, delta_removed=0):
+        """Restore-Stats allows us to craft a more useful commit message,
+        containing the number of patches updated and removed during a restore.
+
+        The data is stored in a temporary file that is cleared when the
+        restore changes ('refreshed patches') are finally commited to the
+        patch-repo.
+
+        This was chosen in favor of a diff short-stat b/c a diffstat counts
+        lines changed and files updated, not num files updated and num files
+        removed.
+        """
+        updated, removed = 0, 0
+
+        if os.path.exists('.plyrestorestats'):
+            with open('.plyrestorestats', 'r') as f:
+                updated, removed = map(int, f.read().strip().split(' '))
+
+        updated += delta_updated
+        removed += delta_removed
+
+        with open('.plyrestorestats', 'w') as f:
+            f.write('%d %d\n' % (updated, removed))
+
+    def _get_and_clear_restore_stats(self):
+        with open('.plyrestorestats', 'r') as f:
+            updated, removed = map(int, f.read().strip().split(' '))
+
+        os.unlink('.plyrestorestats')
+        return updated, removed
 
     def restore(self, three_way_merge=True, quiet=True):
         """Applies a series of patches to the working repo's current branch.
@@ -217,11 +248,13 @@ class WorkingRepo(git.Repo):
                 # Memorize the patch-name that caused the conflict so that
                 # when we later resolve it, we can add the patch-annotation
                 self._create_conflict_file(patch_name)
+                self._update_restore_stats(delta_updated=1)
                 raise
             except git.exc.PatchAlreadyApplied:
-                self.patch_repo.remove_patch(patch_name)
+                self.patch_repo.remove_patches([patch_name])
                 warn("Patch '%s' appears to be upstream, removing from"
                      " patch-repo" % patch_name, quiet=False)
+                self._update_restore_stats(delta_removed=1)
 
             self._add_patch_annotation(patch_name, quiet=quiet)
 
@@ -229,7 +262,10 @@ class WorkingRepo(git.Repo):
         # series have been successfully applied. This minimize chatter in the
         # patch-repo logs.
         if self.patch_repo.uncommitted_changes():
-            self._commit_to_patch_repo('Refreshing patches', quiet=quiet)
+            updated, removed = self._get_and_clear_restore_stats()
+            commit_msg = 'Refreshing patches: %d updated, %d removed' % (
+                    updated, removed)
+            self._commit_to_patch_repo(commit_msg, quiet=quiet)
 
     def rollback(self, quiet=True):
         """Rollback to that last upstream commit."""
@@ -273,23 +309,18 @@ class WorkingRepo(git.Repo):
 
             patch_names.append(patch_name)
 
-        self._store_patch_files(patch_names, filenames,
+        added, updated = self._store_patch_files(patch_names, filenames,
                                 parent_patch_name=parent_patch_name)
 
         # Remove vestigial patches (anything in the series file after the last
         # recognized patch name)
         series = self.patch_repo.series
         last_idx = series.index(patch_names[-1])
-        for patch_name in series[last_idx + 1:len(series)]:
-            if not quiet:
-                print "Removing vestigial patch '%s'" % patch_name
-            self.patch_repo.remove_patch(patch_name)
+        vestigial = series[last_idx + 1:len(series)]
+        removed = self.patch_repo.remove_patches(vestigial)
 
-        if len(filenames) > 1:
-            commit_msg = "Adding %d patches" % len(filenames)
-        else:
-            commit_msg = "Adding %s" % patch_name
-
+        commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
+                len(added), len(updated), len(removed))
         self._commit_to_patch_repo(commit_msg, quiet=quiet)
 
         # Rollback and reapply patches so taht working repo has
@@ -380,6 +411,8 @@ class PatchRepo(git.Repo):
         `None` indicates that the patch-set doesn't have a parent so it should
         be inserted at the beginning of the series file.
         """
+        added = set()
+        updated = set()
         with self._mutate_series_file() as entries:
             if parent_patch_name:
                 base = entries.index(parent_patch_name) + 1
@@ -393,14 +426,22 @@ class PatchRepo(git.Repo):
                     # Already exists, reorder patch by removing it from
                     # current location and inserting it into the new location.
                     entries.remove(patch_name)
+                    updated.add(patch_name)
+                else:
+                    added.add(patch_name)
 
                 entries.insert(base + idx, patch_name)
 
-    def remove_patch(self, patch_name):
-        self.rm(patch_name)
+        return added, updated
 
+    def remove_patches(self, patch_names):
+        removed = set()
         with self._mutate_series_file() as entries:
-            entries.remove(patch_name)
+            for patch_name in patch_names:
+                self.rm(patch_name)
+                entries.remove(patch_name)
+                removed.add(patch_name)
+        return removed
 
     def initialize(self, quiet=True):
         """Initialize the patch repo (create series file and git-init)."""
