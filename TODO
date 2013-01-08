@@ -1,6 +1,8 @@
-- Make _mutate_series_file support recursive series files
-- Hide errors from `git am` when merge fails, we supply our own
-    - Use --resolvemsg when `am` fails
+- BUG: Abort should also remove .plyrestorestats file
+- BUG: On save, only generate commit if there are actual changes in the patch-repo
+  (updated will still be incremented even if no change since a file was copied
+  over)
+- BUG: Make _mutate_series_file support recursive series files
 - Make _applied_patches return a list, generator is a hassle
 
 WISHLIST
@@ -8,3 +10,10 @@ WISHLIST
 - Use argparse in bin/ply
 - Show which patches are being applied in reqular mode. (-q to supress, -v for
   even more info)
+- Create a diff utility to show changes aginst working repo (needed so
+  pull-requests to the Patch-Repo are more human readable)
+- Hide errors from `git am` when merge fails, we supply our own
+    - Use --resolvemsg when `am` fails
+- Differentiate a restore versus a refresh. Restore is point-in-time fixed to
+  a particular base-commit of the working-repo. Refresh isn't and is free to
+  make changes to the patch-repo.

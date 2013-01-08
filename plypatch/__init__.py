@@ -99,9 +99,6 @@ class WorkingRepo(git.Repo):
     def _patch_conflict_path(self):
         return os.path.join(self.path, '.patch-conflict')
 
-    def _conflict_file_exists(self):
-        return os.path.exists(self._patch_conflict_path)
-
     def _create_conflict_file(self, patch_name):
         """The conflict-file gives us a way to memorize the patch-name of the
         conflicting patch so that we can apply the patch-annotation after the
@@ -110,17 +107,6 @@ class WorkingRepo(git.Repo):
         with open(self._patch_conflict_path, 'w') as f:
             f.write('%s\n' % patch_name)
 
-    def _teardown_conflict_file(self):
-        """Return the patch name from the temporary conflict file."""
-        if not os.path.exists(self._patch_conflict_path):
-            raise exc.PathNotFound
-
-        with open(self._patch_conflict_path) as f:
-            patch_name = f.read().strip()
-
-        os.unlink(self._patch_conflict_path)
-        return patch_name
-
     def _resolve_conflict(self, method, quiet=True):
         """Resolve a conflict using one of the following methods:
 
@@ -128,9 +114,17 @@ class WorkingRepo(git.Repo):
             2. Skip
             3. Resolve
         """
+        if not os.path.exists(self._patch_conflict_path):
+            raise exc.PathNotFound
+
         kwargs = {method: True, 'quiet': quiet}
         self.am(**kwargs)
-        return self._teardown_conflict_file()
+
+        with open(self._patch_conflict_path) as f:
+            patch_name = f.read().strip()
+
+        os.unlink(self._patch_conflict_path)
+        return patch_name
 
     def abort(self, quiet=True):
         """Abort a failed merge.
@@ -332,7 +326,7 @@ class WorkingRepo(git.Repo):
     @property
     def status(self):
         """Return the status of the working-repo."""
-        if self._conflict_file_exists():
+        if os.path.exists(self._patch_conflict_path):
             return 'restore-in-progress'
 
         if len(list(self._applied_patches())) == 0:
