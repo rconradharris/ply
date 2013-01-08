@@ -1,3 +1,4 @@
+- Make _mutate_series_file support recursive series files
 - Hide errors from `git am` when merge fails, we supply our own
     - Use --resolvemsg when `am` fails
 - Make _applied_patches return a list, generator is a hassle

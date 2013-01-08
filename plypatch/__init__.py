@@ -276,6 +276,15 @@ class WorkingRepo(git.Repo):
         self._store_patch_files(patch_names, filenames,
                                 parent_patch_name=parent_patch_name)
 
+        # Remove vestigial patches (anything in the series file after the last
+        # recognized patch name)
+        series = self.patch_repo.series
+        last_idx = series.index(patch_names[-1])
+        for patch_name in series[last_idx + 1:len(series)]:
+            if not quiet:
+                print "Removing vestigial patch '%s'" % patch_name
+            self.patch_repo.remove_patch(patch_name)
+
         if len(filenames) > 1:
             commit_msg = "Adding %d patches" % len(filenames)
         else:
@@ -345,16 +354,10 @@ class PatchRepo(git.Repo):
         This function allows you to add/remove/reorder the patches in the
         series-file by manipulating a plain-old Python list.
         """
+        # FIXME: mutate_series_file doesn't support recursive series files yet
         # Read in series file and create list
-        patch_names = []
-        with open(self.series_path) as f:
-            for line in f:
-                line = line.strip()
+        patch_names = self._non_recursive_series(self.series_path)
 
-                if not line:
-                    continue
-
-                patch_names.append(line)
 
         # Allow caller to mutate it
         yield patch_names
@@ -414,23 +417,36 @@ class PatchRepo(git.Repo):
     def series_path(self):
         return os.path.join(self.path, 'series')
 
+    def _non_recursive_series(self, series_path):
+        patch_names = []
+
+        with open(series_path) as f:
+            for line in f:
+                line = line.strip()
+
+                if not line:
+                    continue
+
+                patch_names.append(line)
+
+        return patch_names
+
     def _recursive_series(self, series_path):
         """Emit patch_names from series file, handling -i recursion."""
-        with open(series_path, 'r') as f:
-            for line in f:
-                patch_name = line.strip()
-                if patch_name.startswith('-i '):
-                    # If entry starts with -i, what follows is a path to a
-                    # child series file
-                    series_rel_path = patch_name.split(' ', 1)[1].strip()
-                    child_series_path = os.path.join(
-                        self.path, series_rel_path)
-                    patch_dir = os.path.dirname(series_rel_path)
-                    for child_patch_name in self._recursive_series(
-                            child_series_path):
-                        yield os.path.join(patch_dir, child_patch_name)
-                else:
-                    yield patch_name
+        for patch_name in self._non_recursive_series(series_path):
+            if not patch_name.startswith('-i '):
+                yield patch_name
+                continue
+
+            # If entry starts with -i, what follows is a path to a
+            # child series file
+            series_rel_path = patch_name.split(' ', 1)[1].strip()
+            child_series_path = os.path.join(
+                self.path, series_rel_path)
+            patch_dir = os.path.dirname(series_rel_path)
+            for child_patch_name in self._recursive_series(
+                    child_series_path):
+                yield os.path.join(patch_dir, child_patch_name)
 
     @property
     def series(self):
