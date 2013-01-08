@@ -386,8 +386,12 @@ class PatchRepo(git.Repo):
             for idx, patch_name in enumerate(patch_names):
                 self.add(patch_name)
 
-                if patch_name not in entries:
-                    entries.insert(base + idx, patch_name)
+                if patch_name in entries:
+                    # Already exists, reorder patch by removing it from
+                    # current location and inserting it into the new location.
+                    entries.remove(patch_name)
+
+                entries.insert(base + idx, patch_name)
 
     def remove_patch(self, patch_name):
         self.rm(patch_name)
