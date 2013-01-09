@@ -73,6 +73,9 @@ class WorkingRepo(git.Repo):
                 patch_names, parent_patch_name=parent_patch_name)
 
     def _commit_to_patch_repo(self, commit_msg, quiet=True):
+        if not self.patch_repo.uncommitted_changes():
+            return
+
         based_on = self._last_upstream_commit_hash()
         commit_msg += '\n\nPly-Based-On: %s' % based_on
         self.patch_repo.commit(commit_msg, quiet=quiet)
@@ -189,19 +192,14 @@ class WorkingRepo(git.Repo):
         """Restore-Stats allows us to craft a more useful commit message,
         containing the number of patches updated and removed during a restore.
 
-        The data is stored in a temporary file that is cleared when the
-        restore changes ('refreshed patches') are finally commited to the
-        patch-repo.
+        The data is stored in a temp file that is cleared when the restore is
+        either finished or aborted.
 
-        This was chosen in favor of a diff short-stat b/c a diffstat counts
-        lines changed and files updated, not num files updated and num files
-        removed.
+        Diffstat was not used because it is line-oriented as opposed to
+        file-oriented. Moreover, a `git log --stat` would provide that info
+        already, so the commit msg would be duplicating info.
         """
-        updated, removed = 0, 0
-
-        if os.path.exists(self._restore_stats_path):
-            with open(self._restore_stats_path, 'r') as f:
-                updated, removed = map(int, f.read().strip().split(' '))
+        updated, removed = self._get_restore_stats()
 
         updated += delta_updated
         removed += delta_removed
@@ -209,18 +207,28 @@ class WorkingRepo(git.Repo):
         with open(self._restore_stats_path, 'w') as f:
             f.write('%d %d\n' % (updated, removed))
 
-    def _get_and_clear_restore_stats(self):
-        with open(self._restore_stats_path, 'r') as f:
-            updated, removed = map(int, f.read().strip().split(' '))
+    def _get_restore_stats(self):
+        updated = 0
+        removed = 0
 
-        os.unlink(self._restore_stats_path)
+        if os.path.exists(self._restore_stats_path):
+            with open(self._restore_stats_path, 'r') as f:
+                updated, removed = map(int, f.read().strip().split(' '))
+
         return updated, removed
 
     def restore(self, three_way_merge=True, quiet=True):
-        """Applies a series of patches to the working repo's current branch.
-
-        Each patch applied creates a commit in the working repo.
+        """Applies a series of patches to the working repo's current
+        branch.
         """
+        #####################################################################
+        #
+        #                          Reentrant-Section
+        #
+        # This bit of code is called repeatedly until all of the patches have
+        # been successfully applied, skipped, or we've aborted the restore.
+        #
+        #####################################################################
         if self.uncommitted_changes():
             raise exc.UncommittedChanges
 
@@ -258,14 +266,23 @@ class WorkingRepo(git.Repo):
 
             self._add_patch_annotation(patch_name, quiet=quiet)
 
-        # We only commit to the patch-repo when all of the patches in the
-        # series have been successfully applied. This minimize chatter in the
-        # patch-repo logs.
-        if self.patch_repo.uncommitted_changes():
-            updated, removed = self._get_and_clear_restore_stats()
-            commit_msg = 'Refreshing patches: %d updated, %d removed' % (
-                    updated, removed)
-            self._commit_to_patch_repo(commit_msg, quiet=quiet)
+        ######################################################################
+        #
+        #                              Endgame
+        #
+        # This bit of code is only reached after all patches have been applied
+        # sucessfully or have been skipped. To finish up, we commit any
+        # changes we're holding in the patch-repo and peform any necessary
+        # housekeeping (removing tempfiles, etc.)
+        #
+        ######################################################################
+        updated, removed = self._get_restore_stats()
+        if os.path.exists(self._restore_stats_path):
+            os.unlink(self._restore_stats_path)
+
+        commit_msg = 'Refreshing patches: %d updated, %d removed' % (
+                updated, removed)
+        self._commit_to_patch_repo(commit_msg, quiet=quiet)
 
     def rollback(self, quiet=True):
         """Rollback to that last upstream commit."""

@@ -1,6 +1,3 @@
-- BUG: On save, only generate commit if there are actual changes in the patch-repo
-  (updated will still be incremented even if no change since a file was copied
-  over)
 - BUG: Make _mutate_series_file support recursive series files
 - Make _applied_patches return a list, generator is a hassle
 
