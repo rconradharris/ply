@@ -68,8 +68,8 @@ class WorkingRepo(git.Repo):
             if dirname and not os.path.exists(dest_path):
                 os.makedirs(dest_path)
 
-            os.rename(os.path.join(self.path, filename),
-                      os.path.join(self.patch_repo.path, patch_name))
+            shutil.move(os.path.join(self.path, filename),
+                        os.path.join(self.patch_repo.path, patch_name))
 
         return self.patch_repo.add_patches(
             patch_names, parent_patch_name=parent_patch_name)
@@ -323,7 +323,7 @@ class WorkingRepo(git.Repo):
                     first_line = "From ply%s" % from_file.readline()[45:]
                     to_file.write(first_line)
                     shutil.copyfileobj(from_file, to_file)
-            os.rename(to_file.name, from_filename)
+            shutil.move(to_file.name, from_filename)
 
         commit_msg = self.log(since, pretty='%B', count=1)
         parent_patch_name = utils.get_patch_annotation(commit_msg)
