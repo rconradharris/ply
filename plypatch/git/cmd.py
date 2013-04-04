@@ -117,9 +117,20 @@ def diff_index(treeish, name_only=False):
     return filenames
 
 
-def format_patch(since):
+def format_patch(since, keep_subject=False, no_numbered=False, no_stat=False):
     """Returns a list of patch files"""
-    args = ['git', 'format-patch', since]
+    args = ['git', 'format-patch']
+
+    if keep_subject:
+        args.append('--keep-subject')
+
+    if no_numbered:
+        args.append('--no-numbered')
+
+    if no_stat:
+        args.append('--no-stat')
+
+    args.append(since)
 
     proc = subprocess.Popen(args, stdout=subprocess.PIPE)
     stdout, stderr = proc.communicate()

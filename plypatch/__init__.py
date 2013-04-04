@@ -1,7 +1,9 @@
 import collections
 import contextlib
 import os
+import shutil
 import sys
+import tempfile
 
 from plypatch import exc, git, utils, version
 
@@ -293,7 +295,36 @@ class WorkingRepo(git.Repo):
         self.reset(based_on, hard=True, quiet=quiet)
 
     def _create_patches(self, since):
-        filenames = self.format_patch(since)
+        """
+        The default output of format-patch isn't ideally suited for our
+        purposes since it contains extraneous info as well as text that
+        changes even if the underlying patch doesn't change.
+
+        The following options are used to correct this:
+
+        --keep-subject - remove unecessary [PATCH] prefix
+        --no-stat - remove unecessary diffstat
+        --no-numbered - remove number of patches in set from subject line
+
+        In addition, we need to rewrite the first-line of the patch-file to
+        remove an unecessary commit-hash. On refresh, this would change even
+        if the actual patch was the same, leading to very noisy diffs.
+        """
+        filenames = self.format_patch(
+            since, keep_subject=True, no_numbered=True, no_stat=True)
+
+        # Rewrite first-line 'From <commit-hash>' -> 'From ply'
+        for filename in filenames:
+            from_filename = os.path.join(self.path, filename)
+            with tempfile.NamedTemporaryFile(delete=False) as to_file:
+                with open(from_filename) as from_file:
+                    # len("From fee0d7191da38033ffb29e1d6d88892862064943") =
+                    # 45
+                    first_line = "From ply%s" % from_file.readline()[45:]
+                    to_file.write(first_line)
+                    shutil.copyfileobj(from_file, to_file)
+            os.rename(to_file.name, from_filename)
+
         commit_msg = self.log(since, pretty='%B', count=1)
         parent_patch_name = utils.get_patch_annotation(commit_msg)
         return filenames, parent_patch_name
