@@ -68,9 +68,10 @@ def _create_working_repo(working_repo_path, patch_repo):
     working_repo.add('README')
     working_repo.commit('Adding README', quiet=True)
 
-    _assert_text_exact_match(readme_path,
-            'Now is the time for all good men to come to'
-            ' the aid of there country.')
+    _assert_text_exact_match(
+        readme_path,
+        'Now is the time for all good men to come to'
+        ' the aid of there country.')
 
     us_hash = working_repo._last_upstream_commit_hash()
 
@@ -123,9 +124,10 @@ def _create_working_repo(working_repo_path, patch_repo):
 
     working_repo.resolve()
 
-    _assert_text_exact_match(readme_path,
-            'Now is the time for all good men to come to'
-            ' the aid of their country! Fin.')
+    _assert_text_exact_match(
+        readme_path,
+        'Now is the time for all good men to come to'
+        ' the aid of their country! Fin.')
 
     # Add additional line
     with open(readme_path, 'a') as f:
@@ -149,7 +151,7 @@ def _create_working_repo(working_repo_path, patch_repo):
         pass
     else:
         raise AssertionError('Restore should have failed due to uncommitted'
-                              ' changes in working repo.')
+                             ' changes in working repo.')
 
     working_repo.reset('HEAD', hard=True)
 
@@ -165,7 +167,7 @@ def _create_working_repo(working_repo_path, patch_repo):
         pass
     else:
         raise AssertionError('Restore should have failed due to uncommitted'
-                              ' changes in patch repo.')
+                             ' changes in patch repo.')
 
     patch_repo.reset('HEAD', hard=True)
 
@@ -253,8 +255,9 @@ def _create_working_repo(working_repo_path, patch_repo):
     with open(bogus_patch_path, 'w') as f:
         pass
 
-    assert working_repo.patch_repo.check() == ('failed',
-            dict(no_file=set(), no_series_entry=set(['bogus.patch'])))
+    assert working_repo.patch_repo.check() == (
+        'failed', dict(no_file=set(),
+                       no_series_entry=set(['bogus.patch'])))
 
     os.unlink(bogus_patch_path)
     assert working_repo.patch_repo.check() == ('ok', {})

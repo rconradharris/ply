@@ -70,7 +70,7 @@ class WorkingRepo(git.Repo):
                       os.path.join(self.patch_repo.path, patch_name))
 
         return self.patch_repo.add_patches(
-                patch_names, parent_patch_name=parent_patch_name)
+            patch_names, parent_patch_name=parent_patch_name)
 
     def _commit_to_patch_repo(self, commit_msg, quiet=True):
         if not self.patch_repo.uncommitted_changes():
@@ -281,7 +281,7 @@ class WorkingRepo(git.Repo):
             os.unlink(self._restore_stats_path)
 
         commit_msg = 'Refreshing patches: %d updated, %d removed' % (
-                updated, removed)
+            updated, removed)
         self._commit_to_patch_repo(commit_msg, quiet=quiet)
 
     def rollback(self, quiet=True):
@@ -326,8 +326,8 @@ class WorkingRepo(git.Repo):
 
             patch_names.append(patch_name)
 
-        added, updated = self._store_patch_files(patch_names, filenames,
-                                parent_patch_name=parent_patch_name)
+        added, updated = self._store_patch_files(
+            patch_names, filenames, parent_patch_name=parent_patch_name)
 
         # Remove vestigial patches (anything in the series file after the last
         # recognized patch name)
@@ -337,7 +337,7 @@ class WorkingRepo(git.Repo):
         removed = self.patch_repo.remove_patches(vestigial)
 
         commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
-                len(added), len(updated), len(removed))
+            len(added), len(updated), len(removed))
         self._commit_to_patch_repo(commit_msg, quiet=quiet)
 
         # Rollback and reapply patches so taht working repo has
@@ -405,7 +405,6 @@ class PatchRepo(git.Repo):
         # FIXME: mutate_series_file doesn't support recursive series files yet
         # Read in series file and create list
         patch_names = self._non_recursive_series(self.series_path)
-
 
         # Allow caller to mutate it
         yield patch_names
