@@ -36,14 +36,15 @@ class WorkingRepo(git.Repo):
             yield commit_msg
             skip += 1
 
-    def _last_upstream_commit_hash(self):
+    def _last_upstream_commit_hash(self, new_patches=0):
         """Return the hash for the last upstream commit in the repo.
 
         We use this to annotate patch-repo commits with the version of the
         working-repo they were based off of.
         """
         num_applied = len(list(self._applied_patches()))
-        return self.log(count=1, pretty='%H', skip=num_applied).strip()
+        skip = num_applied + new_patches
+        return self.log(count=1, pretty='%H', skip=skip).strip()
 
     def _applied_patches(self):
         """Return a list of patches that have already been applied to this
@@ -74,11 +75,11 @@ class WorkingRepo(git.Repo):
         return self.patch_repo.add_patches(
             patch_names, parent_patch_name=parent_patch_name)
 
-    def _commit_to_patch_repo(self, commit_msg, quiet=True):
+    def _commit_to_patch_repo(self, commit_msg, quiet=True, new_patches=0):
         if not self.patch_repo.uncommitted_changes():
             return
 
-        based_on = self._last_upstream_commit_hash()
+        based_on = self._last_upstream_commit_hash(new_patches=new_patches)
         commit_msg += '\n\nPly-Based-On: %s' % based_on
         self.patch_repo.commit(commit_msg, quiet=quiet)
 
@@ -369,9 +370,10 @@ class WorkingRepo(git.Repo):
 
         commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
             len(added), len(updated), len(removed))
-        self._commit_to_patch_repo(commit_msg, quiet=quiet)
+        self._commit_to_patch_repo(
+            commit_msg, quiet=quiet, new_patches=len(added))
 
-        # Rollback and reapply patches so taht working repo has
+        # Rollback and reapply patches so that working repo has
         # patch-annotations for latest saved patches
         num_patches = len(self.patch_repo.series)
         self.reset('HEAD~%d' % num_patches, hard=True, quiet=quiet)
