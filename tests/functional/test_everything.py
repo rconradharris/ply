@@ -49,13 +49,18 @@ class FunctionalTestCase(unittest.TestCase):
         with open(self.readme_path) as f:
             self.assertEqual(expected, f.read())
 
-    def write_readme(self, txt, commit_msg=None):
-        with open(self.readme_path, 'w') as f:
+    def write_readme(self, txt, commit_msg=None, mode='w'):
+        with open(self.readme_path, mode) as f:
             f.write(txt)
 
         if commit_msg:
             self.working_repo.add('README')
             self.working_repo.commit(commit_msg, quiet=True)
+
+    def assert_based_on(self, expected):
+        commit_msg = self.patch_repo.log(count=1, pretty='%B').strip()
+        based_on = re.search('Ply-Based-On: (.*)', commit_msg).group(1)
+        self.assertEqual(expected, based_on)
 
     def test_cant_link_twice(self):
         with self.assertRaises(plypatch.exc.AlreadyLinkedToPatchRepo):
@@ -84,10 +89,8 @@ class FunctionalTestCase(unittest.TestCase):
         self.assert_readme('Now is the time for all good men to come to the'
                            ' aid of their country.')
 
-        # Ensure that Ply-Based-On annotation matches upstream hash
-        commit_msg = self.patch_repo.log(count=1, pretty='%B').strip()
-        based_on = re.search('Ply-Based-On: (.*)', commit_msg).group(1)
-        self.assertEqual(self.upstream_hash, based_on)
+        self.assert_based_on(self.upstream_hash)
+        self.assertEqual('all-patches-applied', self.working_repo.status)
 
     def test_two_patches_save_and_restore(self):
         self.write_readme('Now is the time for all good men to come to the'
@@ -110,10 +113,133 @@ class FunctionalTestCase(unittest.TestCase):
         self.assert_readme('Now is the time for all good men to come to the'
                            ' aid of their country!')
 
-        # Ensure that Ply-Based-On annotation matches upstream hash
-        commit_msg = self.patch_repo.log(count=1, pretty='%B').strip()
-        based_on = re.search('Ply-Based-On: (.*)', commit_msg).group(1)
-        self.assertEqual(self.upstream_hash, based_on)
+        self.assert_based_on(self.upstream_hash)
+
+    def test_upstream_changed(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.save(self.upstream_hash)
+        self.working_repo.reset('HEAD^', hard=True, quiet=True)
+
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of there country. Fin.',
+                          commit_msg='Trunk changed')
+
+        new_upstream_hash = self.working_repo.log(count=1, pretty='%H').strip()
+
+        with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
+            self.working_repo.restore(quiet=True)
+
+        # Fix conflict
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country. Fin.')
+        self.working_repo.add('README')
+        self.working_repo.resolve()
+
+        self.assert_based_on(new_upstream_hash)
+
+    def test_rollback(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.save(self.upstream_hash)
+
+        self.working_repo.rollback(quiet=True)
+
+        self.assert_readme('Now is the time for all good men to come to the'
+                           ' aid of there country.')
+
+        self.assertEqual('no-patches-applied', self.working_repo.status)
+
+    def test_uncomitted_change_in_working_repo_cannot_restore(self):
+        self.write_readme('Uncomitted change')
+        with self.assertRaises(plypatch.exc.UncommittedChanges):
+            self.working_repo.restore(quiet=True)
+
+    def test_uncomitted_change_in_patch_repo_cannot_save(self):
+        with open(self.patch_repo.series_path, 'a') as f:
+            f.write('Uncomitted change')
+
+        with self.assertRaises(plypatch.exc.UncommittedChanges):
+            self.working_repo.save('HEAD^', quiet=True)
+
+    def test_merge_patch_upstream_exact_match(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+        self.working_repo.save(self.upstream_hash)
+        self.assertIn('There-Their.patch', self.working_repo.patch_repo.series)
+        self.working_repo.rollback(quiet=True)
+        self.assertEqual('no-patches-applied', self.working_repo.status)
+
+        # Upstream the patch
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.restore(quiet=True)
+
+        self.assertNotIn('There-Their.patch', self.working_repo.patch_repo.series)
+        self.assertNotIn('There-Their.patch',
+                         list(self.working_repo._applied_patches()))
+
+        # Since we upstreamed the one-and-only patch, no patches have been
+        # applied to the working-repo
+        self.assertEqual('no-patches-applied', self.working_repo.status)
+
+    def test_patch_repo_health_check(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.assertEqual(('ok', dict()), self.patch_repo.check())
+
+        # Patch not present in series file
+        bogus_path = os.path.join(self.patch_repo.path, 'bogus.patch')
+        with open(bogus_path, 'w') as f:
+            pass
+
+        expected = ('failed', dict(no_file=set(),
+                                   no_series_entry=set(['bogus.patch'])))
+        self.assertEqual(expected, self.patch_repo.check())
+
+        os.unlink(bogus_path)
+
+        self.assertEqual(('ok', dict()), self.patch_repo.check())
+
+        # Entry in series file has no corresponding patch file
+        with open(self.patch_repo.series_path, 'a') as f:
+            f.write('nonexistant.patch\n')
+
+        expected = ('failed', dict(no_file=set(['nonexistant.patch']),
+                                   no_series_entry=set([])))
+        self.assertEqual(expected, self.patch_repo.check())
+
+    def test_abort(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.save(self.upstream_hash)
+        self.working_repo.rollback(quiet=True)
+
+        self.write_readme('Completely different line.',
+                          commit_msg='Upstream changed')
+
+        with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
+            self.working_repo.restore(quiet=True)
+
+
+        self.assertEqual('restore-in-progress', self.working_repo.status)
+
+        self.working_repo.abort(quiet=True)
+
+        self.assertEqual('no-patches-applied', self.working_repo.status)
+
+        self.assert_readme('Completely different line.')
 
 
 if __name__ == '__main__':

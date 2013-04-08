@@ -1,7 +1,5 @@
 *.swp
 *.pyc
 dist/
-nova_sandbox/
-sandbox/
 .functional-sandbox/
 plypatch.egg-info/

@@ -266,8 +266,8 @@ class WorkingRepo(git.Repo):
                 warn("Patch '%s' appears to be upstream, removing from"
                      " patch-repo" % patch_name, quiet=False)
                 self._update_restore_stats(delta_removed=1)
-
-            self._add_patch_annotation(patch_name, quiet=quiet)
+            else:
+                self._add_patch_annotation(patch_name, quiet=quiet)
 
         ######################################################################
         #
