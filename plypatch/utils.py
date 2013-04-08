@@ -1,9 +1,20 @@
+import contextlib
 import fnmatch
 import os
 import re
 
 
 RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
+
+
+@contextlib.contextmanager
+def usedir(path):
+    orig_path = os.getcwd()
+    os.chdir(path)
+    try:
+        yield
+    finally:
+        os.chdir(orig_path)
 
 
 def get_patch_annotation(commit_msg):

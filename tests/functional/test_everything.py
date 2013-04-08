@@ -182,7 +182,8 @@ class FunctionalTestCase(unittest.TestCase):
 
         self.working_repo.restore(quiet=True)
 
-        self.assertNotIn('There-Their.patch', self.working_repo.patch_repo.series)
+        self.assertNotIn('There-Their.patch',
+                         self.working_repo.patch_repo.series)
         self.assertNotIn('There-Their.patch',
                          list(self.working_repo._applied_patches()))
 
@@ -231,7 +232,6 @@ class FunctionalTestCase(unittest.TestCase):
 
         with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
             self.working_repo.restore(quiet=True)
-
 
         self.assertEqual('restore-in-progress', self.working_repo.status)
 
