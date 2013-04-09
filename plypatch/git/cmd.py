@@ -1,6 +1,7 @@
 import functools
 import os
 import subprocess
+import sys
 
 from plypatch import utils
 from plypatch.git import exc
@@ -17,8 +18,14 @@ def cmd(fn):
 class Repo(object):
     """Represent a git repo."""
 
-    def __init__(self, path):
+    def __init__(self, path, quiet=False, supress_warnings=False):
         self.path = os.path.abspath(path)
+        self.quiet = quiet
+        self.supress_warnings = supress_warnings
+
+    def warn(self, msg):
+        if not self.supress_warnings:
+            print >> sys.stderr, 'warning: %s' % msg
 
     @cmd
     def add(self, filename):
@@ -30,7 +37,7 @@ class Repo(object):
         abort = kwargs.get('abort', False)
         resolved = kwargs.get('resolved', False)
         skip = kwargs.get('skip', False)
-        quiet = kwargs.get('quiet', False)
+        quiet = kwargs.get('quiet', self.quiet)
 
         args = ['git', 'am']
         args.extend(patch_paths)
@@ -78,7 +85,10 @@ class Repo(object):
 
     @cmd
     def commit(self, msg, all=False, amend=False, use_commit_object=None,
-               quiet=False):
+               quiet=None):
+        if quiet is None:
+            quiet = self.quiet
+
         args = ['git', 'commit']
 
         if msg is not None:
@@ -158,10 +168,15 @@ class Repo(object):
         return filenames
 
     @cmd
-    def init(self, directory, quiet=False):
+    def init(self, directory, quiet=None):
+        if quiet is None:
+            quiet = self.quiet
+
         args = ['git', 'init']
+
         if quiet:
             args.append('-q')
+
         args.append(directory)
         subprocess.check_call(args)
 
@@ -183,19 +198,30 @@ class Repo(object):
         return stdout
 
     @cmd
-    def reset(self, commit, hard=False, quiet=False):
+    def reset(self, commit, hard=False, quiet=None):
+        if quiet is None:
+            quiet = self.quiet
+
         args = ['git', 'reset', commit]
+
         if hard:
             args.append('--hard')
+
         if quiet:
             args.append('-q')
+
         subprocess.check_call(args)
 
     @cmd
-    def rm(self, filename, quiet=False):
+    def rm(self, filename, quiet=None):
+        if quiet is None:
+            quiet = self.quiet
+
         args = ['git', 'rm', filename]
+
         if quiet:
             args.append('-q')
+
         subprocess.check_call(args)
 
     def uncommitted_changes(self):

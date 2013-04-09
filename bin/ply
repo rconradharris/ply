@@ -36,8 +36,7 @@ def do_abort(working_repo, *args):
 
     -v: verbose mode
     """
-    quiet = '-v' not in args
-    working_repo.abort(quiet=quiet)
+    working_repo.abort()
 
 
 def do_check(working_repo, *args):
@@ -96,9 +95,8 @@ def do_resolve(working_repo, *args):
 
     -v: verbose mode
     """
-    quiet = '-v' not in args
     try:
-        working_repo.resolve(quiet=quiet)
+        working_repo.resolve()
     except plypatch.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
@@ -108,9 +106,8 @@ def do_restore(working_repo, *args):
 
     -v: verbose mode
     """
-    quiet = '-v' not in args
     try:
-        working_repo.restore(quiet=quiet)
+        working_repo.restore()
     except plypatch.exc.UncommittedChanges:
         die_on_uncommitted_changes()
     except plypatch.git.exc.PatchDidNotApplyCleanly:
@@ -124,9 +121,8 @@ def do_rollback(working_repo, *args):
     history for the earliest Ply-Patch commit and `git reset --hard` to its
     parent.
     """
-    quiet = '-v' not in args
     try:
-        working_repo.rollback(quiet=quiet)
+        working_repo.rollback()
     except plypatch.exc.UncommittedChanges:
         die_on_uncommitted_changes()
 
@@ -144,8 +140,6 @@ def do_save(working_repo, *args):
              format-patches 'since' semantics). `..` is not supported at this
              time.
     """
-    quiet = '-v' not in args
-
     prefix = None
     positional = []
     for arg in args:
@@ -160,7 +154,7 @@ def do_save(working_repo, *args):
         die("ply save <since>")
 
     try:
-        working_repo.save(since, prefix=prefix, quiet=quiet)
+        working_repo.save(since, prefix=prefix)
     except plypatch.exc.UncommittedChanges:
         die_on_uncommitted_changes()
 
@@ -171,9 +165,8 @@ def do_skip(working_repo, *args):
 
     -v: verbose mode
     """
-    quiet = '-v' not in args
     try:
-        working_repo.skip(quiet=quiet)
+        working_repo.skip()
     except plypatch.git.exc.PatchDidNotApplyCleanly:
         die_on_conflicts()
 
@@ -206,10 +199,12 @@ def main():
         print plypatch.__version__
         return
 
+    quiet = '-v' not in sys.argv
+
     cmd = sys.argv[1]
     func = globals().get('do_%s' % cmd)
     if func:
-        working_repo = plypatch.WorkingRepo('.')
+        working_repo = plypatch.WorkingRepo('.', quiet=quiet)
         func(working_repo, *sys.argv[2:])
     else:
         die("command '%s' not found" % cmd)

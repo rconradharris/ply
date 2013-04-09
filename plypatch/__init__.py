@@ -2,7 +2,6 @@ import collections
 import contextlib
 import os
 import shutil
-import sys
 import tempfile
 
 from plypatch import exc, git, utils, version
@@ -11,23 +10,18 @@ from plypatch import exc, git, utils, version
 __version__ = version.__version__
 
 
-def warn(msg, quiet=True):
-    if not quiet:
-        print >> sys.stderr, 'warning: %s' % msg
-
-
 class WorkingRepo(git.Repo):
     """Represents our local fork of the upstream repository.
 
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
-    def _add_patch_annotation(self, patch_name, quiet=True):
+    def _add_patch_annotation(self, patch_name):
         """Add a patch annotation to the last commit."""
         commit_msg = self.log(count=1, pretty='%B')
         if 'Ply-Patch' not in commit_msg:
             commit_msg += '\n\nPly-Patch: %s' % patch_name
-            self.commit(commit_msg, amend=True, quiet=quiet)
+            self.commit(commit_msg, amend=True)
 
     def _walk_commit_msgs_backwards(self):
         skip = 0
@@ -75,13 +69,13 @@ class WorkingRepo(git.Repo):
         return self.patch_repo.add_patches(
             patch_names, parent_patch_name=parent_patch_name)
 
-    def _commit_to_patch_repo(self, commit_msg, quiet=True, new_patches=0):
+    def _commit_to_patch_repo(self, commit_msg, new_patches=0):
         if not self.patch_repo.uncommitted_changes():
             return
 
         based_on = self._last_upstream_commit_hash(new_patches=new_patches)
         commit_msg += '\n\nPly-Based-On: %s' % based_on
-        self.patch_repo.commit(commit_msg, quiet=quiet)
+        self.patch_repo.commit(commit_msg)
 
     @property
     def patch_repo_path(self):
@@ -99,7 +93,9 @@ class WorkingRepo(git.Repo):
         if not self.patch_repo_path:
             raise exc.NoLinkedPatchRepo
 
-        return PatchRepo(self.patch_repo_path)
+        return PatchRepo(self.patch_repo_path,
+                         quiet=self.quiet,
+                         supress_warnings=self.supress_warnings)
 
     @property
     def _patch_conflict_path(self):
@@ -113,7 +109,7 @@ class WorkingRepo(git.Repo):
         with open(self._patch_conflict_path, 'w') as f:
             f.write('%s\n' % patch_name)
 
-    def _resolve_conflict(self, method, quiet=True):
+    def _resolve_conflict(self, method):
         """Resolve a conflict using one of the following methods:
 
             1. Abort
@@ -123,7 +119,7 @@ class WorkingRepo(git.Repo):
         if not os.path.exists(self._patch_conflict_path):
             raise exc.PathNotFound
 
-        kwargs = {method: True, 'quiet': quiet}
+        kwargs = {method: True}
         self.am(**kwargs)
 
         with open(self._patch_conflict_path) as f:
@@ -132,16 +128,16 @@ class WorkingRepo(git.Repo):
         os.unlink(self._patch_conflict_path)
         return patch_name
 
-    def abort(self, quiet=True):
+    def abort(self):
         """Abort a failed merge.
 
         NOTE: this doesn't rollback commits that have successfully applied.
         """
-        self._resolve_conflict('abort', quiet=quiet)
+        self._resolve_conflict('abort')
         os.unlink(self._restore_stats_path)
 
         # Throw away any conflict resolution changes
-        self.reset('HEAD', hard=True, quiet=quiet)
+        self.reset('HEAD', hard=True)
 
     def link(self, patch_repo_path):
         """Link a working-repo to a patch-repo."""
@@ -158,18 +154,17 @@ class WorkingRepo(git.Repo):
 
         self.config('unset', config_key='ply.patchrepo')
 
-    def skip(self, quiet=True):
+    def skip(self):
         """Skip applying current patch and remove from the patch-repo.
 
         This is useful if the patch is no longer relevant because a similar
         change was made upstream.
         """
-        patch_name = self._resolve_conflict('skip', quiet=quiet)
-
+        patch_name = self._resolve_conflict('skip')
         self.patch_repo.remove_patches([patch_name])
-        self.restore(quiet=quiet)  # Apply remaining patches
+        self.restore()  # Apply remaining patches
 
-    def resolve(self, quiet=True):
+    def resolve(self):
         """Resolves a commit and refreshes the affected patch in the
         patch-repo.
 
@@ -177,15 +172,15 @@ class WorkingRepo(git.Repo):
         patch, which would make for a rather chatty history, we instead commit
         one time after all of the patches have been applied.
         """
-        patch_name = self._resolve_conflict('resolved', quiet=quiet)
+        patch_name = self._resolve_conflict('resolved')
 
         filenames, parent_patch_name = self._create_patches('HEAD^')
 
         self._store_patch_files([patch_name], filenames,
                                 parent_patch_name=parent_patch_name)
 
-        self._add_patch_annotation(patch_name, quiet=quiet)
-        self.restore(quiet=quiet)  # Apply remaining patches
+        self._add_patch_annotation(patch_name)
+        self.restore()  # Apply remaining patches
 
     @property
     def _restore_stats_path(self):
@@ -220,7 +215,7 @@ class WorkingRepo(git.Repo):
 
         return updated, removed
 
-    def restore(self, three_way_merge=True, quiet=True):
+    def restore(self, three_way_merge=True):
         """Applies a series of patches to the working repo's current
         branch.
         """
@@ -253,8 +248,7 @@ class WorkingRepo(git.Repo):
             # 3. Patch was already applied: remove from patch-repo, move on to
             #    next patch
             try:
-                self.am(patch_path, three_way_merge=three_way_merge,
-                        quiet=quiet)
+                self.am(patch_path, three_way_merge=three_way_merge)
             except git.exc.PatchDidNotApplyCleanly:
                 # Memorize the patch-name that caused the conflict so that
                 # when we later resolve it, we can add the patch-annotation
@@ -263,11 +257,11 @@ class WorkingRepo(git.Repo):
                 raise
             except git.exc.PatchAlreadyApplied:
                 self.patch_repo.remove_patches([patch_name])
-                warn("Patch '%s' appears to be upstream, removing from"
-                     " patch-repo" % patch_name, quiet=False)
+                self.warn("Patch '%s' appears to be upstream, removing from"
+                          " patch-repo" % patch_name)
                 self._update_restore_stats(delta_removed=1)
             else:
-                self._add_patch_annotation(patch_name, quiet=quiet)
+                self._add_patch_annotation(patch_name)
 
         ######################################################################
         #
@@ -285,15 +279,15 @@ class WorkingRepo(git.Repo):
 
         commit_msg = 'Refreshing patches: %d updated, %d removed' % (
             updated, removed)
-        self._commit_to_patch_repo(commit_msg, quiet=quiet)
+        self._commit_to_patch_repo(commit_msg)
 
-    def rollback(self, quiet=True):
+    def rollback(self):
         """Rollback to that last upstream commit."""
         if self.uncommitted_changes():
             raise exc.UncommittedChanges
 
         based_on = self._last_upstream_commit_hash()
-        self.reset(based_on, hard=True, quiet=quiet)
+        self.reset(based_on, hard=True)
 
     def _create_patches(self, since):
         """
@@ -330,7 +324,7 @@ class WorkingRepo(git.Repo):
         parent_patch_name = utils.get_patch_annotation(commit_msg)
         return filenames, parent_patch_name
 
-    def save(self, since, prefix=None, quiet=True):
+    def save(self, since, prefix=None):
         """Save a series of commits as patches into the patch-repo."""
         if self.uncommitted_changes() or self.patch_repo.uncommitted_changes():
             raise exc.UncommittedChanges
@@ -370,14 +364,13 @@ class WorkingRepo(git.Repo):
 
         commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
             len(added), len(updated), len(removed))
-        self._commit_to_patch_repo(
-            commit_msg, quiet=quiet, new_patches=len(added))
+        self._commit_to_patch_repo(commit_msg, new_patches=len(added))
 
         # Rollback and reapply patches so that working repo has
         # patch-annotations for latest saved patches
         num_patches = len(self.patch_repo.series)
-        self.reset('HEAD~%d' % num_patches, hard=True, quiet=quiet)
-        self.restore(quiet=False)
+        self.reset('HEAD~%d' % num_patches, hard=True)
+        self.restore()
 
     @property
     def status(self):
@@ -492,16 +485,16 @@ class PatchRepo(git.Repo):
                 removed.add(patch_name)
         return removed
 
-    def initialize(self, quiet=True):
+    def initialize(self):
         """Initialize the patch repo (create series file and git-init)."""
-        self.init(self.path, quiet=quiet)
+        self.init(self.path)
 
         if not os.path.exists(self.series_path):
             with open(self.series_path, 'w') as f:
                 pass
 
             self.add('series')
-            self.commit('Ply init', quiet=quiet)
+            self.commit('Ply init')
 
     @property
     def series_path(self):

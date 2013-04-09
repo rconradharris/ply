@@ -9,6 +9,8 @@ import plypatch
 class FunctionalTestCase(unittest.TestCase):
     SANDBOX = '.functional-sandbox'
     KEEP_SANDBOX = True
+    QUIET = True
+    SUPRESS_WARNINGS = True
 
     def setUp(self):
         # Create Sandbox
@@ -20,14 +22,20 @@ class FunctionalTestCase(unittest.TestCase):
         # Create PatchRepo
         self.patch_repo_path = os.path.join(self.SANDBOX, 'patch-repo')
         os.mkdir(self.patch_repo_path)
-        self.patch_repo = plypatch.PatchRepo(self.patch_repo_path)
+        self.patch_repo = plypatch.PatchRepo(
+            self.patch_repo_path,
+            quiet=self.QUIET,
+            supress_warnings=self.SUPRESS_WARNINGS)
         self.patch_repo.initialize()
 
         # Create WorkingRepo
         self.working_repo_path = os.path.join(self.SANDBOX, 'working-repo')
         os.mkdir(self.working_repo_path)
-        self.working_repo = plypatch.WorkingRepo(self.working_repo_path)
-        self.working_repo.init('.', quiet=True)
+        self.working_repo = plypatch.WorkingRepo(
+            self.working_repo_path,
+            quiet=self.QUIET,
+            supress_warnings=self.SUPRESS_WARNINGS)
+        self.working_repo.init('.')
         self.working_repo.link(self.patch_repo_path)
 
         # Add test-file
@@ -55,7 +63,7 @@ class FunctionalTestCase(unittest.TestCase):
 
         if commit_msg:
             self.working_repo.add('README')
-            self.working_repo.commit(commit_msg, quiet=True)
+            self.working_repo.commit(commit_msg)
 
     def assert_based_on(self, expected):
         commit_msg = self.patch_repo.log(count=1, pretty='%B').strip()
@@ -79,12 +87,12 @@ class FunctionalTestCase(unittest.TestCase):
 
         self.working_repo.save(self.upstream_hash)
 
-        self.working_repo.reset('HEAD^', hard=True, quiet=True)
+        self.working_repo.reset('HEAD^', hard=True)
 
         self.assert_readme('Now is the time for all good men to come to'
                            ' the aid of there country.')
 
-        self.working_repo.restore(quiet=True)
+        self.working_repo.restore()
 
         self.assert_readme('Now is the time for all good men to come to the'
                            ' aid of their country.')
@@ -103,12 +111,12 @@ class FunctionalTestCase(unittest.TestCase):
 
         self.working_repo.save(self.upstream_hash)
 
-        self.working_repo.reset('HEAD~2', hard=True, quiet=True)
+        self.working_repo.reset('HEAD~2', hard=True)
 
         self.assert_readme('Now is the time for all good men to come to'
                            ' the aid of there country.')
 
-        self.working_repo.restore(quiet=True)
+        self.working_repo.restore()
 
         self.assert_readme('Now is the time for all good men to come to the'
                            ' aid of their country!')
@@ -121,7 +129,7 @@ class FunctionalTestCase(unittest.TestCase):
                           commit_msg='There -> Their')
 
         self.working_repo.save(self.upstream_hash)
-        self.working_repo.reset('HEAD^', hard=True, quiet=True)
+        self.working_repo.reset('HEAD^', hard=True)
 
         self.write_readme('Now is the time for all good men to come to the'
                           ' aid of there country. Fin.',
@@ -130,7 +138,7 @@ class FunctionalTestCase(unittest.TestCase):
         new_upstream_hash = self.working_repo.log(count=1, pretty='%H').strip()
 
         with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
-            self.working_repo.restore(quiet=True)
+            self.working_repo.restore()
 
         # Fix conflict
         self.write_readme('Now is the time for all good men to come to the'
@@ -147,7 +155,7 @@ class FunctionalTestCase(unittest.TestCase):
 
         self.working_repo.save(self.upstream_hash)
 
-        self.working_repo.rollback(quiet=True)
+        self.working_repo.rollback()
 
         self.assert_readme('Now is the time for all good men to come to the'
                            ' aid of there country.')
@@ -157,14 +165,14 @@ class FunctionalTestCase(unittest.TestCase):
     def test_uncomitted_change_in_working_repo_cannot_restore(self):
         self.write_readme('Uncomitted change')
         with self.assertRaises(plypatch.exc.UncommittedChanges):
-            self.working_repo.restore(quiet=True)
+            self.working_repo.restore()
 
     def test_uncomitted_change_in_patch_repo_cannot_save(self):
         with open(self.patch_repo.series_path, 'a') as f:
             f.write('Uncomitted change')
 
         with self.assertRaises(plypatch.exc.UncommittedChanges):
-            self.working_repo.save('HEAD^', quiet=True)
+            self.working_repo.save('HEAD^')
 
     def test_merge_patch_upstream_exact_match(self):
         self.write_readme('Now is the time for all good men to come to the'
@@ -172,7 +180,7 @@ class FunctionalTestCase(unittest.TestCase):
                           commit_msg='There -> Their')
         self.working_repo.save(self.upstream_hash)
         self.assertIn('There-Their.patch', self.working_repo.patch_repo.series)
-        self.working_repo.rollback(quiet=True)
+        self.working_repo.rollback()
         self.assertEqual('no-patches-applied', self.working_repo.status)
 
         # Upstream the patch
@@ -180,7 +188,7 @@ class FunctionalTestCase(unittest.TestCase):
                           ' aid of their country.',
                           commit_msg='There -> Their')
 
-        self.working_repo.restore(quiet=True)
+        self.working_repo.restore()
 
         self.assertNotIn('There-Their.patch',
                          self.working_repo.patch_repo.series)
@@ -225,17 +233,17 @@ class FunctionalTestCase(unittest.TestCase):
                           commit_msg='There -> Their')
 
         self.working_repo.save(self.upstream_hash)
-        self.working_repo.rollback(quiet=True)
+        self.working_repo.rollback()
 
         self.write_readme('Completely different line.',
                           commit_msg='Upstream changed')
 
         with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
-            self.working_repo.restore(quiet=True)
+            self.working_repo.restore()
 
         self.assertEqual('restore-in-progress', self.working_repo.status)
 
-        self.working_repo.abort(quiet=True)
+        self.working_repo.abort()
 
         self.assertEqual('no-patches-applied', self.working_repo.status)
 
