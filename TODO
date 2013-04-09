@@ -1,4 +1,3 @@
-- Remove 'from import *' in code
 - BUG: Make _mutate_series_file support recursive series files
 - Make _applied_patches return a list, generator is a hassle
 

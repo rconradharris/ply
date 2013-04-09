@@ -4,7 +4,10 @@ import os
 import shutil
 import tempfile
 
-from plypatch import exc, git, utils, version
+from plypatch import exc
+from plypatch import git
+from plypatch import utils
+from plypatch import version
 
 
 __version__ = version.__version__
