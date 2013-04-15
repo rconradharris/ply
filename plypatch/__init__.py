@@ -29,19 +29,28 @@ class WorkingRepo(git.Repo):
     def _walk_commit_msgs_backwards(self):
         skip = 0
         while True:
-            commit_msg = self.log(count=1, pretty='%B', skip=skip)
-            yield commit_msg
+            commit_hash, commit_msg = self.log(
+                count=1, pretty='%H %B', skip=skip).split(' ', 1)
+
+            yield commit_hash, commit_msg
             skip += 1
 
-    def _last_upstream_commit_hash(self, new_patches=0):
+    def _last_upstream_commit_hash(self):
         """Return the hash for the last upstream commit in the repo.
 
         We use this to annotate patch-repo commits with the version of the
         working-repo they were based off of.
+
+        The patch before the earliest Ply-Patch annotated commit is the last
+        upstream commit.
         """
-        num_applied = len(list(self._applied_patches()))
-        skip = num_applied + new_patches
-        return self.log(count=1, pretty='%H', skip=skip).strip()
+        applied = list(self._applied_patches())
+        if not applied:
+            return None
+
+        last_applied_hash = applied[-1][0]
+        return self.log(cmd_arg='%s^' % last_applied_hash,
+                        count=1, pretty='%H').strip()
 
     def _applied_patches(self):
         """Return a list of patches that have already been applied to this
@@ -50,11 +59,11 @@ class WorkingRepo(git.Repo):
         We figure this out by walking backwards from HEAD until we reach a
         commit without a 'Ply-Patch' commit msg annotation.
         """
-        for commit_msg in self._walk_commit_msgs_backwards():
+        for commit_hash, commit_msg in self._walk_commit_msgs_backwards():
             patch_name = utils.get_patch_annotation(commit_msg)
             if not patch_name:
                 break
-            yield patch_name
+            yield commit_hash, patch_name
 
     def _store_patch_files(self, patch_names, filenames,
                            parent_patch_name=None):
@@ -72,11 +81,11 @@ class WorkingRepo(git.Repo):
         return self.patch_repo.add_patches(
             patch_names, parent_patch_name=parent_patch_name)
 
-    def _commit_to_patch_repo(self, commit_msg, new_patches=0):
+    def _commit_to_patch_repo(self, commit_msg):
         if not self.patch_repo.uncommitted_changes():
             return
 
-        based_on = self._last_upstream_commit_hash(new_patches=new_patches)
+        based_on = self._last_upstream_commit_hash()
         commit_msg += '\n\nPly-Based-On: %s' % based_on
         self.patch_repo.commit(commit_msg)
 
@@ -233,7 +242,7 @@ class WorkingRepo(git.Repo):
         if self.uncommitted_changes():
             raise exc.UncommittedChanges
 
-        applied = set(self._applied_patches())
+        applied = set(pn for _, pn in self._applied_patches())
 
         for patch_name in self.patch_repo.series:
             if patch_name in applied:
@@ -365,15 +374,18 @@ class WorkingRepo(git.Repo):
         vestigial = series[last_idx + 1:len(series)]
         removed = self.patch_repo.remove_patches(vestigial)
 
-        commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
-            len(added), len(updated), len(removed))
-        self._commit_to_patch_repo(commit_msg, new_patches=len(added))
-
         # Rollback and reapply patches so that working repo has
         # patch-annotations for latest saved patches
         num_patches = len(self.patch_repo.series)
         self.reset('HEAD~%d' % num_patches, hard=True)
         self.restore()
+
+        # We have to commit to the patch-repo AFTER rolling-back and
+        # reapplying so that we have the patch-annotations necessary to figure
+        # out the correct Ply-Based-On annotation in the patch-repo.
+        commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
+            len(added), len(updated), len(removed))
+        self._commit_to_patch_repo(commit_msg)
 
     @property
     def status(self):

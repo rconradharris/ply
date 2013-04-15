@@ -46,12 +46,14 @@ class FunctionalTestCase(unittest.TestCase):
         self.assert_readme('Now is the time for all good men to come to'
                            ' the aid of there country.')
 
-        self.upstream_hash = self.working_repo.log(
-            count=1, pretty='%H').strip()
+        self.upstream_hash = self.get_working_repo_commit_hash()
 
     def tearDown(self):
         if not self.KEEP_SANDBOX:
             shutil.rmtree(self.SANDBOX)
+
+    def get_working_repo_commit_hash(self, count=1):
+        return self.working_repo.log(count=count, pretty='%H').strip()
 
     def assert_readme(self, expected):
         with open(self.readme_path) as f:
@@ -248,6 +250,25 @@ class FunctionalTestCase(unittest.TestCase):
         self.assertEqual('no-patches-applied', self.working_repo.status)
 
         self.assert_readme('Completely different line.')
+
+    def test_ply_based_on_annotation(self):
+        """The Ply-Based-On annotation in the patch repo should always point
+        to the commit-hash of the working-repo that reflects the version of
+        the upstream code that the patches will apply cleanly to.
+        """
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.save(self.upstream_hash)
+
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country!',
+                          commit_msg='Add exclamation point!')
+
+        self.working_repo.save('HEAD^')
+
+        self.assert_based_on(self.upstream_hash)
 
 
 if __name__ == '__main__':
