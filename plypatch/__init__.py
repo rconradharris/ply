@@ -227,7 +227,7 @@ class WorkingRepo(git.Repo):
 
         return updated, removed
 
-    def restore(self, three_way_merge=True):
+    def restore(self, three_way_merge=True, commit_msg=None):
         """Applies a series of patches to the working repo's current
         branch.
         """
@@ -289,8 +289,10 @@ class WorkingRepo(git.Repo):
         if os.path.exists(self._restore_stats_path):
             os.unlink(self._restore_stats_path)
 
-        commit_msg = 'Refreshing patches: %d updated, %d removed' % (
-            updated, removed)
+        if not commit_msg:
+            commit_msg = 'Refreshing patches: %d updated, %d removed' % (
+                updated, removed)
+
         self._commit_to_patch_repo(commit_msg)
 
     def rollback(self):
@@ -378,14 +380,14 @@ class WorkingRepo(git.Repo):
         # patch-annotations for latest saved patches
         num_patches = len(self.patch_repo.series)
         self.reset('HEAD~%d' % num_patches, hard=True)
-        self.restore()
+
+        commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
+            len(added), len(updated), len(removed))
 
         # We have to commit to the patch-repo AFTER rolling-back and
         # reapplying so that we have the patch-annotations necessary to figure
         # out the correct Ply-Based-On annotation in the patch-repo.
-        commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
-            len(added), len(updated), len(removed))
-        self._commit_to_patch_repo(commit_msg)
+        self.restore(commit_msg=commit_msg)
 
     @property
     def status(self):

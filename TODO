@@ -1,6 +1,10 @@
+- BUG: Patch-repo commit msg says Refreshing when it should say saving (and
+  numbers are wrong)
 - BUG: Ply-Patch new-line delimitting inconsistent
 - BUG: -v before arg causes problem; after arg works
 - BUG: Make _mutate_series_file support recursive series files
+- ENHANCEMENT: ply save should only require a `since` if no annotations;
+  otherwise it should default to saving all patches after first.
 - Make _applied_patches return a list, generator is a hassle
 
 WISHLIST

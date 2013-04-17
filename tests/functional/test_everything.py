@@ -270,6 +270,11 @@ class FunctionalTestCase(unittest.TestCase):
 
         self.assert_based_on(self.upstream_hash)
 
+        commit_msg = self.patch_repo.log(cmd_arg='HEAD^', pretty='%B')
+
+        # '[s]aving' shoudl be in commit msg, not 'refreshing'
+        self.assertIn('aving', commit_msg)
+
 
 if __name__ == '__main__':
     unittest.main()
