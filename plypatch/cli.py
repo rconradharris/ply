@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """
 ply: git-based patch management
 """
@@ -234,7 +233,3 @@ def main():
 
     # Dispatch to command handler (`do`)
     args.func(args)
-
-
-if __name__ == "__main__":
-    main()

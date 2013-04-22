@@ -20,5 +20,7 @@ setuptools.setup(
         'Programming Language :: Python :: 2.6'
     ],
     install_requires=[],
-    scripts=['bin/ply']
+    entry_points={
+        'console_scripts': ['ply = plypatch.cli:main']
+    }
 )
