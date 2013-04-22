@@ -53,7 +53,10 @@ class AbortCommand(CLICommand):
 
     def do(self, args):
         """Abort in-progress restore operation"""
-        self.working_repo.abort()
+        try:
+            self.working_repo.abort()
+        except plypatch.exc.NothingToResolve:
+            die('ERROR: nothing to abort from')
 
 
 class CheckCommand(CLICommand):
