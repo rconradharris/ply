@@ -14,6 +14,10 @@ class NoPatchesApplied(PlyException):
     pass
 
 
+class NothingToResolve(PlyException):
+    pass
+
+
 class PathNotFound(PlyException):
     pass
 

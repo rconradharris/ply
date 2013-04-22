@@ -134,7 +134,7 @@ class WorkingRepo(git.Repo):
             3. Resolve
         """
         if not os.path.exists(self._patch_conflict_path):
-            raise exc.PathNotFound
+            raise exc.NothingToResolve
 
         kwargs = {method: True}
         self.am(**kwargs)

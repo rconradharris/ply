@@ -123,6 +123,8 @@ class ResolveCommand(CLICommand):
         """
         try:
             self.working_repo.resolve()
+        except plypatch.exc.NothingToResolve:
+            die('ERROR: nothing to resolve')
         except plypatch.git.exc.PatchDidNotApplyCleanly:
             die_on_conflicts()
 
