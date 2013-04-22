@@ -24,7 +24,7 @@ def die_on_conflicts():
 
 
 def die_on_uncommitted_changes():
-    die('ERROR: Uncommitted changes, commit or discard before continuing.')
+    die('Uncommitted changes, commit or discard before continuing.')
 
 
 class CLICommand(object):
@@ -56,7 +56,7 @@ class AbortCommand(CLICommand):
         try:
             self.working_repo.abort()
         except plypatch.exc.NothingToResolve:
-            die('ERROR: nothing to abort from')
+            die('Nothing to abort')
 
 
 class CheckCommand(CLICommand):
@@ -64,7 +64,10 @@ class CheckCommand(CLICommand):
 
     def do(self, args):
         """Peform a health check on the patch-repo"""
-        status, errors = self.working_repo.check_patch_repo()
+        try:
+            status, errors = self.working_repo.check_patch_repo()
+        except plypatch.exc.NoLinkedPatchRepo:
+            die('Not linked to a patch-repo')
 
         print status.upper()
 
@@ -127,7 +130,7 @@ class ResolveCommand(CLICommand):
         try:
             self.working_repo.resolve()
         except plypatch.exc.NothingToResolve:
-            die('ERROR: nothing to resolve')
+            die('Nothing to resolve')
         except plypatch.git.exc.PatchDidNotApplyCleanly:
             die_on_conflicts()
 
@@ -154,7 +157,7 @@ class RollbackCommand(CLICommand):
         try:
             self.working_repo.rollback()
         except plypatch.exc.NoPatchesApplied:
-            die('ERROR: cannot rollback, no patches applied')
+            die('Cannot rollback, no patches applied')
         except plypatch.exc.UncommittedChanges:
             die_on_uncommitted_changes()
 

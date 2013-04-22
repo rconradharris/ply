@@ -1,5 +1,3 @@
-- BUG: ply check on no linked repo should error gracefully
-
 - BUG: Make _mutate_series_file support recursive series files
 - ENHANCEMENT: ply save should only require a `since` if no annotations;
   otherwise it should default to saving all patches after first.
