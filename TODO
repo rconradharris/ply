@@ -1,10 +1,13 @@
-- Use argparse in bin/ply
-- BUG: -v before arg causes problem; after arg works
+- CLEANUP: Use console_scripts entrypoint
+- BUG: double rollback breaks
+- BUG: resolve when not in resolve-mode should error gracefully
+- BUG: abort when not restoring should error gracefully
+- BUG: ply check on no linked repo should error gracefully
 
 - BUG: Make _mutate_series_file support recursive series files
 - ENHANCEMENT: ply save should only require a `since` if no annotations;
   otherwise it should default to saving all patches after first.
-- Make _applied_patches return a list, generator is a hassle
+- CLEANUP: Make _applied_patches return a list, generator is a hassle
 
 WISHLIST
 
