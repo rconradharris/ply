@@ -29,10 +29,15 @@ class WorkingRepo(git.Repo):
     def _walk_commit_msgs_backwards(self):
         skip = 0
         while True:
-            commit_hash, commit_msg = self.log(
+            value = self.log(
                 count=1, pretty='%H %B', skip=skip).split(' ', 1)
 
+            if not value[0]:
+                break
+
+            commit_hash, commit_msg = value
             yield commit_hash, commit_msg
+
             skip += 1
 
     def _last_upstream_commit_hash(self):

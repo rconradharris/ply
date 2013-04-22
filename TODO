@@ -1,7 +1,6 @@
-- BUG: Patch-repo commit msg says Refreshing when it should say saving (and
-  numbers are wrong)
-- BUG: Ply-Patch new-line delimitting inconsistent
+- Use argparse in bin/ply
 - BUG: -v before arg causes problem; after arg works
+
 - BUG: Make _mutate_series_file support recursive series files
 - ENHANCEMENT: ply save should only require a `since` if no annotations;
   otherwise it should default to saving all patches after first.
@@ -9,7 +8,6 @@
 
 WISHLIST
 
-- Use argparse in bin/ply
 - Show which patches are being applied in reqular mode. (-q to supress, -v for
   even more info)
 - Create a diff utility to show changes aginst working repo (needed so
@@ -19,3 +17,10 @@ WISHLIST
 - Differentiate a restore versus a refresh. Restore is point-in-time fixed to
   a particular base-commit of the working-repo. Refresh isn't and is free to
   make changes to the patch-repo.
+
+LOW PRIORITY
+
+- BUG: Ply-Patch new-line delimitting inconsistent
+    - This is caused by Gerrit's AddChangeId git-hook which attempts to add
+      Change-Id to footer. One fix would be to turn off git-commit hook on this
+      one amend operation.

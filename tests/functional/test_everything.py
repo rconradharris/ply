@@ -272,7 +272,7 @@ class FunctionalTestCase(unittest.TestCase):
 
         commit_msg = self.patch_repo.log(cmd_arg='HEAD^', pretty='%B')
 
-        # '[s]aving' shoudl be in commit msg, not 'refreshing'
+        # '[s]aving' should be in commit msg, not 'refreshing'
         self.assertIn('aving', commit_msg)
 
 
