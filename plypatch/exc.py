@@ -2,11 +2,15 @@ class PlyException(Exception):
     pass
 
 
+class AlreadyLinkedToPatchRepo(PlyException):
+    pass
+
+
 class NoLinkedPatchRepo(PlyException):
     pass
 
 
-class AlreadyLinkedToPatchRepo(PlyException):
+class NoPatchesApplied(PlyException):
     pass
 
 

@@ -1,4 +1,3 @@
-- BUG: double rollback breaks
 - BUG: resolve when not in resolve-mode should error gracefully
 - BUG: abort when not restoring should error gracefully
 - BUG: ply check on no linked repo should error gracefully

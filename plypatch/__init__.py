@@ -306,7 +306,10 @@ class WorkingRepo(git.Repo):
             raise exc.UncommittedChanges
 
         based_on = self._last_upstream_commit_hash()
-        self.reset(based_on, hard=True)
+        if based_on:
+            self.reset(based_on, hard=True)
+        else:
+            raise exc.NoPatchesApplied
 
     def _create_patches(self, since):
         """
