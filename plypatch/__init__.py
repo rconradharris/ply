@@ -1,6 +1,7 @@
 import collections
 import contextlib
 import os
+import re
 import shutil
 import tempfile
 
@@ -12,6 +13,8 @@ from plypatch import version
 
 __version__ = version.__version__
 
+RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
+
 
 class WorkingRepo(git.Repo):
     """Represents our local fork of the upstream repository.
@@ -21,22 +24,30 @@ class WorkingRepo(git.Repo):
     """
     def _add_patch_annotation(self, patch_name):
         """Add a patch annotation to the last commit."""
-        commit_msg = self.log(count=1, pretty='%B')
-        if 'Ply-Patch' not in commit_msg:
-            commit_msg += '\n\nPly-Patch: %s' % patch_name
-            self.commit(commit_msg, amend=True)
+        self.notes('append', message='Ply-Patch: %s' % patch_name)
 
-    def _walk_commit_msgs_backwards(self):
+    def _get_patch_annotation(self, notes):
+        """Return the Ply-Patch annotation if present in the git notes.
+
+        Returns None if not present.
+        """
+        matches = re.search(RE_PATCH_IDENTIFIER, notes)
+        if not matches:
+            return None
+
+        return matches.group(1)
+
+    def _walk_notes_backwards(self):
         skip = 0
         while True:
             value = self.log(
-                count=1, pretty='%H %B', skip=skip).split(' ', 1)
+                count=1, pretty='%H %N', skip=skip).split(' ', 1)
 
             if not value[0]:
                 break
 
-            commit_hash, commit_msg = value
-            yield commit_hash, commit_msg
+            commit_hash, notes = value
+            yield commit_hash, notes
 
             skip += 1
 
@@ -76,8 +87,8 @@ class WorkingRepo(git.Repo):
         """
         applied = []
 
-        for commit_hash, commit_msg in self._walk_commit_msgs_backwards():
-            patch_name = utils.get_patch_annotation(commit_msg)
+        for commit_hash, notes in self._walk_notes_backwards():
+            patch_name = self._get_patch_annotation(notes)
 
             if patch_name:
                 # Patch found, must be within A
@@ -90,7 +101,7 @@ class WorkingRepo(git.Repo):
                 new_upper_bound -= 1
             else:
                 # Exhausted N search, assume no patches applied
-                raise exc.NoPatchesApplied
+                break
 
         return applied
 
@@ -364,10 +375,11 @@ class WorkingRepo(git.Repo):
                     first_line = "From ply%s" % from_file.readline()[45:]
                     to_file.write(first_line)
                     shutil.copyfileobj(from_file, to_file)
+
             shutil.move(to_file.name, from_filename)
 
-        commit_msg = self.log(since, pretty='%B', count=1)
-        parent_patch_name = utils.get_patch_annotation(commit_msg)
+        notes = self.log(since, pretty='%N', count=1)
+        parent_patch_name = self._get_patch_annotation(notes)
         return filenames, parent_patch_name
 
     def save(self, since=None, prefix=None):
@@ -390,7 +402,7 @@ class WorkingRepo(git.Repo):
         for filename in filenames:
             # If commit already has annotation, use that patch-name
             with open(os.path.join(self.path, filename)) as f:
-                patch_name = utils.get_patch_annotation(f.read())
+                patch_name = self._get_patch_annotation(f.read())
 
             # Otherwise... take it from the `git format-patch` filename
             if not patch_name:

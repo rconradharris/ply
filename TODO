@@ -1,12 +1,10 @@
-- BUG: do not save Ply-Patch annotation
-- BUG: changeId is creeping in
+- Show which patches are being applied in reqular mode. (-q to supress, -v for
+  even more info)
 
 - BUG: Make _mutate_series_file support recursive series files
 
 WISHLIST
 
-- Show which patches are being applied in reqular mode. (-q to supress, -v for
-  even more info)
 - Create a diff utility to show changes aginst working repo (needed so
   pull-requests to the Patch-Repo are more human readable)
 - Hide errors from `git am` when merge fails, we supply our own
@@ -14,10 +12,3 @@ WISHLIST
 - Differentiate a restore versus a refresh. Restore is point-in-time fixed to
   a particular base-commit of the working-repo. Refresh isn't and is free to
   make changes to the patch-repo.
-
-LOW PRIORITY
-
-- BUG: Ply-Patch new-line delimitting inconsistent
-    - This is caused by Gerrit's AddChangeId git-hook which attempts to add
-      Change-Id to footer. One fix would be to turn off git-commit hook on this
-      one amend operation.

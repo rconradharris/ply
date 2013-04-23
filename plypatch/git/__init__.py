@@ -198,6 +198,15 @@ class Repo(object):
         return stdout
 
     @cmd
+    def notes(self, command, message=None):
+        args = ['git', 'notes', command]
+
+        if message:
+            args.extend(['-m', message])
+
+        subprocess.check_call(args)
+
+    @cmd
     def reset(self, commit, hard=False, quiet=None):
         if quiet is None:
             quiet = self.quiet
