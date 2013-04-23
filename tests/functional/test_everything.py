@@ -275,6 +275,38 @@ class FunctionalTestCase(unittest.TestCase):
         # '[s]aving' should be in commit msg, not 'refreshing'
         self.assertIn('aving', commit_msg)
 
+    def test_save_no_since_supplied(self):
+        """A `save` without a `since` argument is a shortcut for save
+        <upstream-hash>.
+
+        If no patches have been applied, then `save` without `since` should
+        raise an exception.
+        """
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.save(self.upstream_hash)
+        self.assert_based_on(self.upstream_hash)
+        self.assertEqual(
+            self.upstream_hash, self.working_repo._last_upstream_commit_hash())
+
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country!',
+                          commit_msg='Add exclamation point!')
+
+        self.working_repo.save()
+
+        self.working_repo.rollback()
+
+        self.assert_readme('Now is the time for all good men to come to'
+                           ' the aid of there country.')
+
+        self.working_repo.restore()
+
+        self.assert_readme('Now is the time for all good men to come to'
+                           ' the aid of their country!')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,7 +1,7 @@
+- BUG: do not save Ply-Patch annotation
+- BUG: changeId is creeping in
+
 - BUG: Make _mutate_series_file support recursive series files
-- ENHANCEMENT: ply save should only require a `since` if no annotations;
-  otherwise it should default to saving all patches after first.
-- CLEANUP: Make _applied_patches return a list, generator is a hassle
 
 WISHLIST
 

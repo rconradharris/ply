@@ -166,13 +166,15 @@ class SaveCommand(CLICommand):
     __command__ = 'save'
 
     def add_arguments(self, subparser):
-        subparser.add_argument('since', action='store')
-        subparser.add_argument('--prefix', action='store')
+        subparser.add_argument('-s', '--since')
+        subparser.add_argument('-p', '--prefix')
 
     def do(self, args):
         """Save set of commits to patch-repo"""
         try:
             self.working_repo.save(args.since, prefix=args.prefix)
+        except plypatch.exc.NoPatchesApplied:
+            die('No patches applied, so cannot detect new patches to save')
         except plypatch.exc.UncommittedChanges:
             die_on_uncommitted_changes()
 

@@ -49,7 +49,7 @@ class WorkingRepo(git.Repo):
         The patch before the earliest Ply-Patch annotated commit is the last
         upstream commit.
         """
-        applied = list(self._applied_patches())
+        applied = self._applied_patches()
         if not applied:
             return None
 
@@ -57,18 +57,42 @@ class WorkingRepo(git.Repo):
         return self.log(cmd_arg='%s^' % last_applied_hash,
                         count=1, pretty='%H').strip()
 
-    def _applied_patches(self):
+    def _applied_patches(self, new_upper_bound=50):
         """Return a list of patches that have already been applied to this
         branch.
 
-        We figure this out by walking backwards from HEAD until we reach a
-        commit without a 'Ply-Patch' commit msg annotation.
+        We can have 3 types of commits, upstream (U), applied (A), and new
+        (N), which makes the history look like:
+
+                        UUU...U    ->   AAA...A    ->    NNN..N
+
+        In theory, any number of 'new' commits could exist, meaning we'd
+        potentially have to search ALL commits in order to determine if any
+        patches have been applied.
+
+        To avoid this costly operation, an upper-bound is given such that if
+        we don't find an applied patch within that number of queries, we
+        consider no patches as having been applied.
         """
+        applied = []
+
         for commit_hash, commit_msg in self._walk_commit_msgs_backwards():
             patch_name = utils.get_patch_annotation(commit_msg)
-            if not patch_name:
+
+            if patch_name:
+                # Patch found, must be within A
+                applied.append((commit_hash, patch_name))
+            elif applied:
+                # Applied patches, but this isn't one: must be at U/A border
                 break
-            yield commit_hash, patch_name
+            elif new_upper_bound > 0:
+                # No applied patches found yet: searching through N
+                new_upper_bound -= 1
+            else:
+                # Exhausted N search, assume no patches applied
+                raise exc.NoPatchesApplied
+
+        return applied
 
     def _store_patch_files(self, patch_names, filenames,
                            parent_patch_name=None):
@@ -346,10 +370,16 @@ class WorkingRepo(git.Repo):
         parent_patch_name = utils.get_patch_annotation(commit_msg)
         return filenames, parent_patch_name
 
-    def save(self, since, prefix=None):
+    def save(self, since=None, prefix=None):
         """Save a series of commits as patches into the patch-repo."""
         if self.uncommitted_changes() or self.patch_repo.uncommitted_changes():
             raise exc.UncommittedChanges
+
+        if not since:
+            since = self._last_upstream_commit_hash()
+
+        if not since:
+            raise exc.NoPatchesApplied
 
         if '..' in since:
             raise ValueError(".. not supported at the moment")
@@ -403,7 +433,7 @@ class WorkingRepo(git.Repo):
         if os.path.exists(self._patch_conflict_path):
             return 'restore-in-progress'
 
-        if len(list(self._applied_patches())) == 0:
+        if len(self._applied_patches()) == 0:
             return 'no-patches-applied'
 
         return 'all-patches-applied'

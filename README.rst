@@ -46,12 +46,14 @@ Usage
     ply status
     All patches applied
 
-* Save the last commit as a new patch in the `patch-repo`::
+* Save set of commits to the `patch-repo`::
 
-    ply save        # Without arguments, HEAD^ is assumed
+    # Without --since, any 'new' patches (patches that follow applied patches)
+    # will be saved
+    ply save
 
-    # Explicit since argument, saves into `foo` subdirectory in the patch-repo
-    ply save --prefix=foo HEAD^
+    # Save only the last commit into the 'foo' subdirectory
+    ply save --since=HEAD^ --prefix=foo HEAD^
 
 * Rollback `working-repo` to match upstream::
 
@@ -89,6 +91,7 @@ Usage
   The output of this can be piped into ``dot`` to generate a PNG file::
 
         ply graph | dot -Tpng > dependencies.png
+
 
 `ply` vs X?
 ===========
