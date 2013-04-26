@@ -186,9 +186,25 @@ class FunctionalTestCase(unittest.TestCase):
         self.assertEqual('no-patches-applied', self.working_repo.status)
 
         # Upstream the patch
+        #
+        # This test was randomly failing due to the way git works; the
+        # solution was to add the [HASHHACK] suffix to the commit msg.
+        #
+        # The reason the test would fail is that the downstream and upstream
+        # commit objects would (sometimes) be commited within the same
+        # second, due to how fast the test runs, causing them to receive the
+        # same commit hash.
+        #
+        # Since they shared the same commit hash, the second, upstream commit
+        # would erroneously share the git-notes from the first, downstream
+        # commit object, which caused the test to fail.
+        #
+        # The solution is to either sleep (which slows the test), or to modify
+        # the commit msg so that the commit-object hashes to a different
+        # value.
         self.write_readme('Now is the time for all good men to come to the'
                           ' aid of their country.',
-                          commit_msg='There -> Their')
+                          commit_msg='There -> Their [HASHHACK]')
 
         self.working_repo.restore()
 

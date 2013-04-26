@@ -3,6 +3,7 @@ import contextlib
 import os
 import re
 import shutil
+import sys
 import tempfile
 
 from plypatch import exc
@@ -283,8 +284,9 @@ class WorkingRepo(git.Repo):
             raise exc.UncommittedChanges
 
         applied = set(pn for _, pn in self._applied_patches())
+        series = self.patch_repo.series
 
-        for patch_name in self.patch_repo.series:
+        for idx, patch_name in enumerate(series):
             if patch_name in applied:
                 continue
 
@@ -315,6 +317,10 @@ class WorkingRepo(git.Repo):
             else:
                 self._add_patch_annotation(patch_name)
 
+            sys.stdout.write('\rRestoring %d/%d' % (len(applied) + idx + 1,
+                                                    len(series)))
+            sys.stdout.flush()
+
         ######################################################################
         #
         #                              Endgame
@@ -325,6 +331,8 @@ class WorkingRepo(git.Repo):
         # housekeeping (removing tempfiles, etc.)
         #
         ######################################################################
+        sys.stdout.write('\n')
+
         updated, removed = self._get_restore_stats()
         if os.path.exists(self._restore_stats_path):
             os.unlink(self._restore_stats_path)
