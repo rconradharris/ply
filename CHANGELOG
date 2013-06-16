@@ -1,3 +1,4 @@
 Next
 
+- No longer show all patches as updated when adding a patch (#1)
 - Fixed incorrect patch counter on resolve (#2)

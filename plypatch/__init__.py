@@ -1,5 +1,6 @@
 import collections
 import contextlib
+import filecmp
 import os
 import re
 import shutil
@@ -109,18 +110,9 @@ class WorkingRepo(git.Repo):
     def _store_patch_files(self, patch_names, filenames,
                            parent_patch_name=None):
         """Store a set of patch files in the patch-repo."""
-        for patch_name, filename in zip(patch_names, filenames):
-            # Ensure destination exists (in case a prefix was supplied)
-            dirname = os.path.dirname(patch_name)
-            dest_path = os.path.join(self.patch_repo.path, dirname)
-            if dirname and not os.path.exists(dest_path):
-                os.makedirs(dest_path)
-
-            shutil.move(os.path.join(self.path, filename),
-                        os.path.join(self.patch_repo.path, patch_name))
-
+        source_paths = [os.path.join(self.path, f) for f in filenames]
         return self.patch_repo.add_patches(
-            patch_names, parent_patch_name=parent_patch_name)
+            patch_names, source_paths, parent_patch_name=parent_patch_name)
 
     def _commit_to_patch_repo(self, commit_msg):
         if not self.patch_repo.uncommitted_changes():
@@ -229,8 +221,9 @@ class WorkingRepo(git.Repo):
 
         filenames, parent_patch_name = self._create_patches('HEAD^')
 
-        self._store_patch_files([patch_name], filenames,
-                                parent_patch_name=parent_patch_name)
+        source_paths = [os.path.join(self.path, f) for f in filenames]
+        self.patch_repo.add_patches(
+            [patch_name], source_paths, parent_patch_name=parent_patch_name)
 
         self._add_patch_annotation(patch_name)
         self.restore()  # Apply remaining patches
@@ -428,8 +421,9 @@ class WorkingRepo(git.Repo):
 
             patch_names.append(patch_name)
 
-        added, updated = self._store_patch_files(
-            patch_names, filenames, parent_patch_name=parent_patch_name)
+        source_paths = [os.path.join(self.path, f) for f in filenames]
+        added, updated = self.patch_repo.add_patches(
+            patch_names, source_paths, parent_patch_name=parent_patch_name)
 
         # Remove vestigial patches (anything in the series file after the last
         # recognized patch name)
@@ -521,7 +515,7 @@ class PatchRepo(git.Repo):
 
         self.add('series')
 
-    def add_patches(self, patch_names, parent_patch_name=None):
+    def add_patches(self, patch_names, source_paths, parent_patch_name=None):
         """Add patches to the patch-repo, including add them to the series
         file in the appropriate location.
 
@@ -534,6 +528,28 @@ class PatchRepo(git.Repo):
         """
         added = set()
         updated = set()
+
+        # Move patches into patch-repo
+        for patch_name, source_path in zip(patch_names, source_paths):
+            # Ensure destination exists (in case a prefix was supplied)
+            dirname = os.path.dirname(patch_name)
+            dest_path = os.path.join(self.path, dirname)
+            if dirname and not os.path.exists(dest_path):
+                os.makedirs(dest_path)
+
+            dest_path = os.path.join(self.path, patch_name)
+            if os.path.exists(dest_path):
+                # For simplicity, we regenerate all patches, however some will
+                # be the same, so perform a file compare so we keep accurate
+                # counts of which were truly updatd
+                if not filecmp.cmp(source_path, dest_path):
+                    updated.add(patch_name)
+                    shutil.move(source_path, dest_path)
+            else:
+                added.add(patch_name)
+                shutil.move(source_path, dest_path)
+
+        # Update series file
         with self._mutate_series_file() as entries:
             if parent_patch_name:
                 base = entries.index(parent_patch_name) + 1
@@ -547,9 +563,6 @@ class PatchRepo(git.Repo):
                     # Already exists, reorder patch by removing it from
                     # current location and inserting it into the new location.
                     entries.remove(patch_name)
-                    updated.add(patch_name)
-                else:
-                    added.add(patch_name)
 
                 entries.insert(base + idx, patch_name)
 

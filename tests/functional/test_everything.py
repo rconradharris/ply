@@ -323,6 +323,24 @@ class FunctionalTestCase(unittest.TestCase):
         self.assert_readme('Now is the time for all good men to come to'
                            ' the aid of their country!')
 
+    def test_restore_stats_for_new_patch(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.save(self.upstream_hash)
+
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country!',
+                          commit_msg='Add exclamation point!')
+
+        self.working_repo.save()
+
+        commit_msg = self.patch_repo.log(count=1, pretty='%B').strip()
+
+        expected = 'Saving patches: added 1, updated 0, removed 0'
+        self.assertIn(expected, commit_msg)
+
 
 if __name__ == '__main__':
     unittest.main()
