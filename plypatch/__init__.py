@@ -286,7 +286,9 @@ class WorkingRepo(git.Repo):
         applied = set(pn for _, pn in self._applied_patches())
         series = self.patch_repo.series
 
-        for idx, patch_name in enumerate(series):
+        total_applied = len(applied)
+
+        for patch_name in series:
             if patch_name in applied:
                 continue
 
@@ -317,7 +319,9 @@ class WorkingRepo(git.Repo):
             else:
                 self._add_patch_annotation(patch_name)
 
-            sys.stdout.write('\rRestoring %d/%d' % (len(applied) + idx + 1,
+            total_applied += 1
+
+            sys.stdout.write('\rRestoring %d/%d' % (total_applied,
                                                     len(series)))
             sys.stdout.flush()
 
