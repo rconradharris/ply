@@ -225,6 +225,9 @@ COMMANDS = [AbortCommand, CheckCommand, GraphCommand, InitCommand,
 
 def main():
     parser = argparse.ArgumentParser(prog='ply', description=__doc__)
+    parser.add_argument('--no-fetch', dest='fetch_remotes',
+                        action='store_false', default=True,
+                        help="Avoid fetching remotes before restore")
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help="show verbose output")
     parser.add_argument('--version', action='version',
@@ -242,6 +245,7 @@ def main():
     args = parser.parse_args()
 
     working_repo.quiet = not args.verbose
+    working_repo.fetch_remotes = args.fetch_remotes
 
     # Dispatch to command handler (`do`)
     args.func(args)

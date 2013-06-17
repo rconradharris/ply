@@ -325,7 +325,8 @@ class WorkingRepo(git.Repo):
 
         # FIXME: this should probably not be done in the reentrant section and
         # instead should be done one time, on initializing the restore
-        self.fetch(all=True)
+        if self.fetch_remotes:
+            self.fetch(all=True)
 
         applied = set(pn for _, pn in self._applied_patches())
         series = self.patch_repo.series

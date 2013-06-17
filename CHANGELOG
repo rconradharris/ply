@@ -1,7 +1,13 @@
 Next
 
-- BUG: Hardcode Git version in patch-files to avoid chatty diffs (#5)
-- BUG: Fixed SHA1 missing issue which prevented three-way merges (#3)
-- BUG: Fixed incorrect patch counter on resolve (#2)
-- BUG: Fixed issue where updated patches were miscounted when adding a new
-       patch (#1)
+- NEW OPTION: --no-fetch - Disable fetching of remotes on restore
+
+- FIXED: Git version differences causing chatty diffs by hardcoding it to
+         constant value (#5)
+
+- FIXED: SHA1 missing issue which prevented three-way merges (#3)
+
+- FIXED: Incorrect patch counter on resolve (#2)
+
+- FIXED: Issue where updated patches were miscounted when adding a new patch
+         (#1)
