@@ -1,4 +1,5 @@
-Next
+0.3.4
+=====
 
 - NEW OPTION: --no-fetch - Disable fetching of remotes on restore.
 
