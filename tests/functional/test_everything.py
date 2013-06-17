@@ -21,22 +21,11 @@ class FunctionalTestCase(unittest.TestCase):
 
         # Create PatchRepo
         self.patch_repo_path = os.path.join(self.SANDBOX, 'patch-repo')
-        os.mkdir(self.patch_repo_path)
-        self.patch_repo = plypatch.PatchRepo(
-            self.patch_repo_path,
-            quiet=self.QUIET,
-            supress_warnings=self.SUPRESS_WARNINGS)
-        self.patch_repo.initialize()
+        self.patch_repo = self._create_patch_repo(self.patch_repo_path)
 
         # Create WorkingRepo
         self.working_repo_path = os.path.join(self.SANDBOX, 'working-repo')
-        os.mkdir(self.working_repo_path)
-        self.working_repo = plypatch.WorkingRepo(
-            self.working_repo_path,
-            quiet=self.QUIET,
-            supress_warnings=self.SUPRESS_WARNINGS)
-        self.working_repo.init('.')
-        self.working_repo.link(self.patch_repo_path)
+        self.working_repo = self._create_working_repo(self.working_repo_path)
 
         # Add test-file
         self.readme_path = os.path.join(self.working_repo_path, 'README')
@@ -47,6 +36,23 @@ class FunctionalTestCase(unittest.TestCase):
                            ' the aid of there country.')
 
         self.upstream_hash = self.get_working_repo_commit_hash()
+
+    def _create_patch_repo(self, path):
+        os.mkdir(path)
+        patch_repo = plypatch.PatchRepo(
+                path, quiet=self.QUIET,
+                supress_warnings=self.SUPRESS_WARNINGS)
+        patch_repo.initialize()
+        return patch_repo
+
+    def _create_working_repo(self, path):
+        os.mkdir(path)
+        working_repo = plypatch.WorkingRepo(
+                path, quiet=self.QUIET,
+                supress_warnings=self.SUPRESS_WARNINGS)
+        working_repo.init('.')
+        working_repo.link(self.patch_repo_path)
+        return working_repo
 
     def tearDown(self):
         if not self.KEEP_SANDBOX:
@@ -340,6 +346,50 @@ class FunctionalTestCase(unittest.TestCase):
 
         expected = 'Saving patches: added 1, updated 0, removed 0'
         self.assertIn(expected, commit_msg)
+
+    def test_blob_missing(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        # Create second repo cloned from first
+        working_repo2_path = os.path.join(self.SANDBOX, 'working-repo2')
+        working_repo2 = plypatch.WorkingRepo(
+                working_repo2_path, quiet=self.QUIET,
+                supress_warnings=self.SUPRESS_WARNINGS)
+
+        with plypatch.utils.usedir(self.SANDBOX):
+            working_repo2.clone('working-repo')
+
+        working_repo2.link(self.patch_repo_path)
+
+        # Make an upstream change in repo and refresh patches
+        #
+        # NOTE: This part is same as test_upstream_changed
+        self.working_repo.save(self.upstream_hash)
+        self.working_repo.reset('HEAD^', hard=True)
+
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of there country. Fin.',
+                          commit_msg='Trunk changed')
+
+        with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
+            self.working_repo.restore()
+
+        # Fix conflict and
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country. Fin.')
+        self.working_repo.add('README')
+        self.working_repo.resolve()
+
+        # If we're not careful here, working_repo2 won't have the blob from
+        # working_repo, so the three-way merge won't work. We need to perform
+        # a `git fetch --all` to lessen this risk
+        with self.assertRaises(
+                plypatch.git.exc.PatchDidNotApplyCleanly) as cm:
+            working_repo2.restore()
+
+        self.assertNotEqual('PatchBlobSHA1Invalid', cm.exception.__class__.__name__)
 
 
 if __name__ == '__main__':

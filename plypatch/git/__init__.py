@@ -54,17 +54,23 @@ class Repo(object):
         if abort:
             args.append('--abort')
 
-        proc = subprocess.Popen(args, stdout=subprocess.PIPE)
+        proc = subprocess.Popen(args,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
 
         if not quiet:
             print stdout
 
-        if proc.returncode != 0:
-            raise exc.PatchDidNotApplyCleanly
+        if proc.returncode == 0:
+            if 'atch already applied' in stdout:
+                raise exc.PatchAlreadyApplied
+        else:
+            if 'sha1 information is lacking or useless' in stderr:
+                raise exc.PatchBlobSHA1Invalid
+            else:
+                raise exc.PatchDidNotApplyCleanly
 
-        if 'atch already applied' in stdout:
-            raise exc.PatchAlreadyApplied
 
     @cmd
     def checkout(self, branch_name, create=False, create_and_reset=False):
@@ -82,6 +88,10 @@ class Repo(object):
 
         args.append(branch_name)
         subprocess.check_call(args)
+
+    # NOTE: clone shouldn't use cmd because directory doesn't exist yet
+    def clone(self, path):
+        subprocess.check_call(['git', 'clone', path, self.path])
 
     @cmd
     def commit(self, msg, all=False, amend=False, use_commit_object=None,
@@ -142,6 +152,15 @@ class Repo(object):
             raise exc.GitException((proc.returncode, stdout, stderr))
         filenames = [line.strip() for line in stdout.split('\n') if line]
         return filenames
+
+    @cmd
+    def fetch(self, all=False):
+        args = ['git', 'fetch']
+
+        if all:
+            args.append('--all')
+
+        subprocess.check_call(args)
 
     @cmd
     def format_patch(self, since, keep_subject=False, no_numbered=False,

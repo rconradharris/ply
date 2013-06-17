@@ -1,4 +1,6 @@
 Next
 
-- No longer show all patches as updated when adding a patch (#1)
-- Fixed incorrect patch counter on resolve (#2)
+- BUG: Fixed SHA1 missing issue which prevented three-way merges (#3)
+- BUG: Fixed incorrect patch counter on resolve (#2)
+- BUG: Fixed issue where updated patches were miscounted when adding a new
+       patch (#1)

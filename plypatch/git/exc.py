@@ -10,5 +10,9 @@ class PatchDidNotApplyCleanly(GitException):
     pass
 
 
+class PatchBlobSHA1Invalid(PatchDidNotApplyCleanly):
+    pass
+
+
 class MutuallyIncompatibleOptions(GitException):
     pass
