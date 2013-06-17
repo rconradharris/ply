@@ -71,12 +71,14 @@ class WorkingRepo(git.Repo):
     This is where we will create new patches (save) or apply previous patches
     to create a new patch-branch (restore).
     """
+    fetch_remotes = True
+
     def _add_patch_annotation(self, patch_name):
         """Add a patch annotation to the last commit."""
         self.notes('append', message='Ply-Patch: %s' % patch_name)
 
     def _get_patch_annotation(self, notes):
-        """Return the Ply-Patch annotation if present in the git notes.
+        """Return the Ply-Patch annotation if present.
 
         Returns None if not present.
         """
@@ -85,20 +87,6 @@ class WorkingRepo(git.Repo):
             return None
 
         return matches.group(1)
-
-    def _walk_notes_backwards(self):
-        skip = 0
-        while True:
-            value = self.log(
-                count=1, pretty='%H %N', skip=skip).split(' ', 1)
-
-            if not value[0]:
-                break
-
-            commit_hash, notes = value
-            yield commit_hash, notes
-
-            skip += 1
 
     def _last_upstream_commit_hash(self):
         """Return the hash for the last upstream commit in the repo.
@@ -116,6 +104,18 @@ class WorkingRepo(git.Repo):
         last_applied_hash = applied[-1][0]
         return self.log(cmd_arg='%s^' % last_applied_hash,
                         count=1, pretty='%H').strip()
+
+    def _get_commit_hash_and_patch_name(self, cmd_arg=None, count=1,
+                                        skip=None):
+        value = self.log(cmd_arg, count=count, pretty='%H %N',
+                         skip=skip).split(' ', 1)
+
+        if not value[0]:
+            return None, None
+
+        commit_hash, notes = value
+        patch_name = self._get_patch_annotation(notes)
+        return commit_hash, patch_name
 
     def _applied_patches(self, new_upper_bound=50):
         """Return a list of patches that have already been applied to this
@@ -136,8 +136,15 @@ class WorkingRepo(git.Repo):
         """
         applied = []
 
-        for commit_hash, notes in self._walk_notes_backwards():
-            patch_name = self._get_patch_annotation(notes)
+        skip = 0
+        while True:
+            commit_hash, patch_name = self._get_commit_hash_and_patch_name(
+                    None, skip=skip)
+
+            skip += 1
+
+            if not commit_hash:
+                break
 
             if patch_name:
                 # Patch found, must be within A
@@ -431,8 +438,8 @@ class WorkingRepo(git.Repo):
 
             shutil.move(to_file.name, from_filename)
 
-        notes = self.log(since, pretty='%N', count=1)
-        parent_patch_name = self._get_patch_annotation(notes)
+        parent_patch_name = self._get_commit_hash_and_patch_name(
+                since)[1]
         return filenames, parent_patch_name
 
     def save(self, since=None, prefix=None):
