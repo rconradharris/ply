@@ -49,7 +49,7 @@ index bc56c4d..ebd7525 100644
 -Foo
 +Bar
 -- 
-1.8.3.1.245.g39fd762
+1.8.3
 
 """
         to_file.seek(0)

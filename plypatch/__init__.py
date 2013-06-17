@@ -19,6 +19,7 @@ RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
 
 
 FROM_SHA1_VALUE = 'ply'
+PATCH_GIT_VERSION = '1.8.3'
 
 
 def _replace_from_sha1(lines):
@@ -38,9 +39,29 @@ def _replace_from_sha1(lines):
     lines[line_idx] = ' '.join(parts)
 
 
+def _replace_git_version(lines):
+    """The version of git is embedded in the patch which will differ causing
+    chatty-diffs and unecessary conflicts.
+
+    It's terribly evil, but hardcoding this is the easiest way to avoid these
+    conflicts.
+    """
+    for reverse_line_idx, line in enumerate(reversed(lines)):
+        if line[0].isdigit() and '.' in line:
+            break
+    else:
+        raise Exception("Malformed patch: Git version not found")
+
+    # The last line counting backwards (0) becomes -(0) - 1 which becomes -1
+    # counting foward
+    line_idx = -reverse_line_idx - 1
+    lines[line_idx] = '%s\n' % PATCH_GIT_VERSION
+
+
 def _fixup_patch(from_file, to_file):
     lines = from_file.readlines()
     _replace_from_sha1(lines)
+    _replace_git_version(lines)
     to_file.write(''.join(lines))
 
 
