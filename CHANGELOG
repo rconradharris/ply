@@ -1,13 +1,16 @@
 Next
 
-- NEW OPTION: --no-fetch - Disable fetching of remotes on restore
+- NEW OPTION: --no-fetch - Disable fetching of remotes on restore.
+
+- FIXED: Git notes not persisting across a rebase. Reverted back to annotating
+         in the commit message itself. (#4)
 
 - FIXED: Git version differences causing chatty diffs by hardcoding it to
-         constant value (#5)
+         constant value. (#5)
 
-- FIXED: SHA1 missing issue which prevented three-way merges (#3)
+- FIXED: SHA1 missing issue which prevented three-way merges. (#3)
 
-- FIXED: Incorrect patch counter on resolve (#2)
+- FIXED: Incorrect patch counter on resolve. (#2)
 
-- FIXED: Issue where updated patches were miscounted when adding a new patch
+- FIXED: Issue where updated patches were miscounted when adding a new patch.
          (#1)

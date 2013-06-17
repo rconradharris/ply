@@ -58,10 +58,21 @@ def _replace_git_version(lines):
     lines[line_idx] = '%s\n' % PATCH_GIT_VERSION
 
 
+def _remove_ply_patch_annotation(lines):
+    match_idxs = []
+    for idx, line in enumerate(lines):
+        if 'Ply-Patch:' in line:
+            match_idxs.append(idx)
+
+    for idx in reversed(match_idxs):
+        del lines[idx]
+
+
 def _fixup_patch(from_file, to_file):
     lines = from_file.readlines()
     _replace_from_sha1(lines)
     _replace_git_version(lines)
+    _remove_ply_patch_annotation(lines)
     to_file.write(''.join(lines))
 
 
@@ -75,14 +86,17 @@ class WorkingRepo(git.Repo):
 
     def _add_patch_annotation(self, patch_name):
         """Add a patch annotation to the last commit."""
-        self.notes('append', message='Ply-Patch: %s' % patch_name)
+        commit_msg = self.log(count=1, pretty='%B')
+        if 'Ply-Patch' not in commit_msg:
+            commit_msg += '\n\nPly-Patch: %s' % patch_name
+            self.commit(commit_msg, amend=True)
 
-    def _get_patch_annotation(self, notes):
+    def _get_patch_annotation(self, description):
         """Return the Ply-Patch annotation if present.
 
         Returns None if not present.
         """
-        matches = re.search(RE_PATCH_IDENTIFIER, notes)
+        matches = re.search(RE_PATCH_IDENTIFIER, description)
         if not matches:
             return None
 
@@ -107,14 +121,14 @@ class WorkingRepo(git.Repo):
 
     def _get_commit_hash_and_patch_name(self, cmd_arg=None, count=1,
                                         skip=None):
-        value = self.log(cmd_arg, count=count, pretty='%H %N',
+        value = self.log(cmd_arg, count=count, pretty='%H %B',
                          skip=skip).split(' ', 1)
 
         if not value[0]:
             return None, None
 
-        commit_hash, notes = value
-        patch_name = self._get_patch_annotation(notes)
+        commit_hash, description = value
+        patch_name = self._get_patch_annotation(description)
         return commit_hash, patch_name
 
     def _applied_patches(self, new_upper_bound=50):
@@ -139,7 +153,7 @@ class WorkingRepo(git.Repo):
         skip = 0
         while True:
             commit_hash, patch_name = self._get_commit_hash_and_patch_name(
-                    None, skip=skip)
+                None, skip=skip)
 
             skip += 1
 
@@ -439,7 +453,7 @@ class WorkingRepo(git.Repo):
             shutil.move(to_file.name, from_filename)
 
         parent_patch_name = self._get_commit_hash_and_patch_name(
-                since)[1]
+            since)[1]
         return filenames, parent_patch_name
 
     def save(self, since=None, prefix=None):
