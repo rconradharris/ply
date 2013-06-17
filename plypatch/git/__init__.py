@@ -71,7 +71,6 @@ class Repo(object):
             else:
                 raise exc.PatchDidNotApplyCleanly
 
-
     @cmd
     def checkout(self, branch_name, create=False, create_and_reset=False):
         args = ['git', 'checkout']

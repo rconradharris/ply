@@ -18,6 +18,32 @@ __version__ = version.__version__
 RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
 
 
+FROM_SHA1_VALUE = 'ply'
+
+
+def _replace_from_sha1(lines):
+    """The SHA1 on the 'From' line of the patch will differ each time the
+    patch file is regenerated. To keep this from causing chatty diffs,
+    replace the SHA1 with a hardcoded value.
+    """
+    for line_idx, line in enumerate(lines):
+        if line.startswith('From'):
+            break
+    else:
+        raise Exception("Malformed patch: 'From' not found")
+
+    parts = lines[line_idx].split(' ')
+    parts[1] = FROM_SHA1_VALUE
+
+    lines[line_idx] = ' '.join(parts)
+
+
+def _fixup_patch(from_file, to_file):
+    lines = from_file.readlines()
+    _replace_from_sha1(lines)
+    to_file.write(''.join(lines))
+
+
 class WorkingRepo(git.Repo):
     """Represents our local fork of the upstream repository.
 
@@ -379,11 +405,7 @@ class WorkingRepo(git.Repo):
             from_filename = os.path.join(self.path, filename)
             with tempfile.NamedTemporaryFile(delete=False) as to_file:
                 with open(from_filename) as from_file:
-                    # len("From fee0d7191da38033ffb29e1d6d88892862064943") =
-                    # 45
-                    first_line = "From ply%s" % from_file.readline()[45:]
-                    to_file.write(first_line)
-                    shutil.copyfileobj(from_file, to_file)
+                    _fixup_patch(from_file, to_file)
 
             shutil.move(to_file.name, from_filename)
 
