@@ -275,7 +275,7 @@ class WorkingRepo(git.Repo):
         """
         patch_name = self._resolve_conflict('skip')
         self.patch_repo.remove_patches([patch_name])
-        self.restore()  # Apply remaining patches
+        self.restore(fetch_remotes=False)  # Apply remaining patches
 
     def resolve(self):
         """Resolves a commit and refreshes the affected patch in the
@@ -294,7 +294,7 @@ class WorkingRepo(git.Repo):
             [patch_name], source_paths, parent_patch_name=parent_patch_name)
 
         self._add_patch_annotation(patch_name)
-        self.restore()  # Apply remaining patches
+        self.restore(fetch_remotes=False)  # Apply remaining patches
 
     @property
     def _restore_stats_path(self):
@@ -329,7 +329,8 @@ class WorkingRepo(git.Repo):
 
         return updated, removed
 
-    def restore(self, three_way_merge=True, commit_msg=None):
+    def restore(self, three_way_merge=True, commit_msg=None,
+                fetch_remotes=True):
         """Applies a series of patches to the working repo's current
         branch.
         """
@@ -344,9 +345,7 @@ class WorkingRepo(git.Repo):
         if self.uncommitted_changes():
             raise exc.UncommittedChanges
 
-        # FIXME: this should probably not be done in the reentrant section and
-        # instead should be done one time, on initializing the restore
-        if self.fetch_remotes:
+        if fetch_remotes and self.fetch_remotes:
             self.fetch(all=True)
 
         applied = set(pn for _, pn in self._applied_patches())
@@ -512,7 +511,7 @@ class WorkingRepo(git.Repo):
         # We have to commit to the patch-repo AFTER rolling-back and
         # reapplying so that we have the patch-annotations necessary to figure
         # out the correct Ply-Based-On annotation in the patch-repo.
-        self.restore(commit_msg=commit_msg)
+        self.restore(commit_msg=commit_msg, fetch_remotes=False)
 
     @property
     def status(self):
