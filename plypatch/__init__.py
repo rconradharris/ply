@@ -257,6 +257,8 @@ class WorkingRepo(git.Repo):
         if self.patch_repo_path:
             raise exc.AlreadyLinkedToPatchRepo
 
+        patch_repo_path = os.path.abspath(os.path.expanduser(patch_repo_path))
+
         self.config('add', config_key='ply.patchrepo',
                     config_value=patch_repo_path)
 
