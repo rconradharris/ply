@@ -611,7 +611,9 @@ class PatchRepo(git.Repo):
                 # For simplicity, we regenerate all patches, however some will
                 # be the same, so perform a file compare so we keep accurate
                 # counts of which were truly updatd
-                if not filecmp.cmp(source_path, dest_path):
+                if filecmp.cmp(source_path, dest_path):
+                    os.unlink(source_path)
+                else:
                     updated.add(patch_name)
                     shutil.move(source_path, dest_path)
             else:

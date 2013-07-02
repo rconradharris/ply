@@ -1,3 +1,4 @@
+import glob
 import os
 import re
 import shutil
@@ -340,12 +341,20 @@ class FunctionalTestCase(unittest.TestCase):
                           ' aid of their country!',
                           commit_msg='Add exclamation point!')
 
+        self.assertEqual([], glob.glob(os.path.join(self.working_repo.path,
+                                                    '*.patch')))
+
         self.working_repo.save()
 
         commit_msg = self.patch_repo.log(count=1, pretty='%B').strip()
 
         expected = 'Saving patches: added 1, updated 0, removed 0'
         self.assertIn(expected, commit_msg)
+
+        # Ensure that we cleaned up any patch-files that weren't moved in to
+        # the patch-repo because they were exact matches (filecmp=True)
+        self.assertEqual([], glob.glob(os.path.join(self.working_repo.path,
+                                                    '*.patch')))
 
     def test_blob_missing(self):
         self.write_readme('Now is the time for all good men to come to the'
