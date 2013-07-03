@@ -344,6 +344,9 @@ class WorkingRepo(git.Repo):
         # been successfully applied, skipped, or we've aborted the restore.
         #
         #####################################################################
+        if self.rebase_in_progress():
+            raise exc.RestoreInProgress
+
         if self.uncommitted_changes():
             raise exc.UncommittedChanges
 

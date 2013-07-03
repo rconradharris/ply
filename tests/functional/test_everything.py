@@ -400,6 +400,25 @@ class FunctionalTestCase(unittest.TestCase):
 
         self.assertNotEqual('PatchBlobSHA1Invalid', cm.exception.__class__.__name__)
 
+    def test_restore_after_conflict_should_raise_restore_in_progress(self):
+        self.write_readme('Now is the time for all good men to come to the'
+                          ' aid of their country.',
+                          commit_msg='There -> Their')
+
+        self.working_repo.save(self.upstream_hash)
+        self.working_repo.rollback()
+
+        self.write_readme('Completely different line.',
+                          commit_msg='Upstream changed')
+
+        with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
+            self.working_repo.restore()
+
+        self.assertEqual('restore-in-progress', self.working_repo.status)
+
+        with self.assertRaises(plypatch.exc.RestoreInProgress):
+            self.working_repo.restore()
+
 
 if __name__ == '__main__':
     unittest.main()

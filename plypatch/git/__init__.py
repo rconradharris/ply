@@ -253,3 +253,6 @@ class Repo(object):
 
     def uncommitted_changes(self):
         return len(self.diff_index('HEAD')) != 0
+
+    def rebase_in_progress(self):
+        return os.path.exists(os.path.join(self.path, '.git', 'rebase-apply'))

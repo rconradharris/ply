@@ -27,6 +27,10 @@ def die_on_uncommitted_changes():
     die('Uncommitted changes, commit or discard before continuing.')
 
 
+def die_on_restore_in_progress():
+    die('Restore already in progress, resolve or abort before continuing.')
+
+
 class CLICommand(object):
     __command__ = None
 
@@ -143,6 +147,8 @@ class RestoreCommand(CLICommand):
         working-repo"""
         try:
             self.working_repo.restore()
+        except plypatch.exc.RestoreInProgress:
+            die_on_restore_in_progress()
         except plypatch.exc.UncommittedChanges:
             die_on_uncommitted_changes()
         except plypatch.git.exc.PatchDidNotApplyCleanly:

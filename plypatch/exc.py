@@ -24,3 +24,7 @@ class PathNotFound(PlyException):
 
 class UncommittedChanges(PlyException):
     pass
+
+
+class RestoreInProgress(PlyException):
+    pass
