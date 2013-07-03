@@ -13,10 +13,18 @@ def die(msg):
     sys.exit(1)
 
 
-def die_on_conflicts():
-    print "Patch did not apply cleanly. To fix:"
+def die_on_conflicts(threeway_merged=True):
+    print "Patch did not apply cleanly.",
+    if threeway_merged:
+        print "Threeway-merge was completed but resulted in conflicts. To fix:"
+    else:
+        print "Unable to threeway-merge. To fix:"
     print
-    print "\t1) Fix conflicts in affected files"
+    if threeway_merged:
+        print "\t1) Fix conflicts in affected files"
+    else:
+        print "\t1) Manually apply '.git/rebase-apply/patch' (git apply" \
+              " --reject usually works) then resolve conflicts"
     print "\n\t2) `git add` affected files"
     print "\n\t3) Run `ply resolve` to refresh the patch and"\
           " apply the rest\n\t   of the patches in the series."
@@ -135,8 +143,10 @@ class ResolveCommand(CLICommand):
             self.working_repo.resolve()
         except plypatch.exc.NothingToResolve:
             die('Nothing to resolve')
+        except plypatch.git.exc.PatchBlobSHA1Invalid:
+            die_on_conflicts(threeway_merged=False)
         except plypatch.git.exc.PatchDidNotApplyCleanly:
-            die_on_conflicts()
+            die_on_conflicts(threeway_merged=True)
 
 
 class RestoreCommand(CLICommand):
@@ -151,8 +161,10 @@ class RestoreCommand(CLICommand):
             die_on_restore_in_progress()
         except plypatch.exc.UncommittedChanges:
             die_on_uncommitted_changes()
+        except plypatch.git.exc.PatchBlobSHA1Invalid:
+            die_on_conflicts(threeway_merged=False)
         except plypatch.git.exc.PatchDidNotApplyCleanly:
-            die_on_conflicts()
+            die_on_conflicts(threeway_merged=True)
 
 
 class RollbackCommand(CLICommand):
@@ -194,8 +206,10 @@ class SkipCommand(CLICommand):
         """
         try:
             self.working_repo.skip()
+        except plypatch.git.exc.PatchBlobSHA1Invalid:
+            die_on_conflicts(threeway_merged=False)
         except plypatch.git.exc.PatchDidNotApplyCleanly:
-            die_on_conflicts()
+            die_on_conflicts(threeway_merged=True)
 
 
 class StatusCommand(CLICommand):

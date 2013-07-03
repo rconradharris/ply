@@ -1,6 +1,8 @@
 0.3.5
 =====
 
+- FIXED: Better error when threeway-merge fails (#8)
+
 - FIXED: Better error message when restore is already in-progress (#12)
 
 - FIXED: Use absolute path when linking working-repo to patch-repo (#13)

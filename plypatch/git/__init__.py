@@ -60,6 +60,7 @@ class Repo(object):
         stdout, stderr = proc.communicate()
 
         if not quiet:
+            print stderr
             print stdout
 
         if proc.returncode == 0:
