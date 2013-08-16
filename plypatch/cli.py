@@ -9,8 +9,12 @@ from plypatch import git
 
 
 def die(msg):
+    exit(msg, 1)
+
+
+def exit(msg, code=0):
     print msg
-    sys.exit(1)
+    sys.exit(code)
 
 
 def die_on_conflicts(threeway_merged=True):
@@ -68,7 +72,7 @@ class AbortCommand(CLICommand):
         try:
             self.working_repo.abort()
         except plypatch.exc.NothingToResolve:
-            die('Nothing to abort')
+            exit('Nothing to abort')
 
 
 class CheckCommand(CLICommand):
