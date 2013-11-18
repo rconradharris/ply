@@ -79,9 +79,13 @@ class FunctionalTestCase(unittest.TestCase):
         based_on = re.search('Ply-Based-On: (.*)', commit_msg).group(1)
         self.assertEqual(expected, based_on)
 
-    def test_cant_link_twice(self):
-        with self.assertRaises(plypatch.exc.AlreadyLinkedToPatchRepo):
+    def test_already_linked_same_repo(self):
+        with self.assertRaises(plypatch.exc.AlreadyLinkedToSamePatchRepo):
             self.working_repo.link(self.patch_repo_path)
+
+    def test_already_linked_different_repo(self):
+        with self.assertRaises(plypatch.exc.AlreadyLinkedToDifferentPatchRepo):
+            self.working_repo.link('/bin')
 
     def test_cant_unlink_if_not_linked(self):
         self.working_repo.unlink()

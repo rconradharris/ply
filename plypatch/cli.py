@@ -132,8 +132,11 @@ class LinkCommand(CLICommand):
         """Link a working-repo to a patch-repo"""
         try:
             self.working_repo.link(args.path)
-        except plypatch.exc.AlreadyLinkedToPatchRepo:
-            die('Already linked to a patch-repo')
+        except plypatch.exc.AlreadyLinkedToSamePatchRepo:
+            print 'Already linked to this patch-repo'
+        except plypatch.exc.AlreadyLinkedToDifferentPatchRepo as e:
+            die('Already linked to a different patch-repo: %s'
+                % e.patch_repo_path)
 
 
 class ResolveCommand(CLICommand):

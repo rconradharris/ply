@@ -3,6 +3,16 @@ class PlyException(Exception):
 
 
 class AlreadyLinkedToPatchRepo(PlyException):
+    def __init__(self, patch_repo_path=None):
+        super(AlreadyLinkedToPatchRepo, self).__init__()
+        self.patch_repo_path = patch_repo_path
+
+
+class AlreadyLinkedToSamePatchRepo(AlreadyLinkedToPatchRepo):
+    pass
+
+
+class AlreadyLinkedToDifferentPatchRepo(AlreadyLinkedToPatchRepo):
     pass
 
 
