@@ -254,10 +254,21 @@ class WorkingRepo(git.Repo):
 
     def link(self, patch_repo_path):
         """Link a working-repo to a patch-repo."""
-        if self.patch_repo_path:
-            raise exc.AlreadyLinkedToPatchRepo
-
         patch_repo_path = os.path.abspath(os.path.expanduser(patch_repo_path))
+
+        if not os.path.exists(patch_repo_path):
+            raise exc.PathNotFound
+
+        if self.patch_repo_path:
+            existing_patch_repo_path = os.path.abspath(
+                    os.path.expanduser(self.patch_repo_path))
+
+            if os.path.samefile(existing_patch_repo_path, patch_repo_path):
+                raise exc.AlreadyLinkedToSamePatchRepo(
+                    patch_repo_path=self.patch_repo_path)
+            else:
+                raise exc.AlreadyLinkedToDifferentPatchRepo(
+                    patch_repo_path=self.patch_repo_path)
 
         self.config('add', config_key='ply.patchrepo',
                     config_value=patch_repo_path)
