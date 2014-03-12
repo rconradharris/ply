@@ -1,3 +1,19 @@
+0.3.7
+=====
+
+- CHANGED: Abort now rolls back to last upstream commit
+
+
+0.3.6
+=====
+
+- CHANGED: Link is now idempotent: re-linking will issue a warning but will
+           return a zero exit code
+
+- CHANGED: Abort is now idempotent: aborting when nothing is in-progress will
+           issue a warning but return a zero exit code
+
+
 0.3.5
 =====
 

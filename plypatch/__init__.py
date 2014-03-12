@@ -248,9 +248,7 @@ class WorkingRepo(git.Repo):
         """
         self._resolve_conflict('abort')
         os.unlink(self._restore_stats_path)
-
-        # Throw away any conflict resolution changes
-        self.reset('HEAD', hard=True)
+        self.rollback(lose_uncommitted=True)
 
     def link(self, patch_repo_path):
         """Link a working-repo to a patch-repo."""
@@ -261,7 +259,7 @@ class WorkingRepo(git.Repo):
 
         if self.patch_repo_path:
             existing_patch_repo_path = os.path.abspath(
-                    os.path.expanduser(self.patch_repo_path))
+                os.path.expanduser(self.patch_repo_path))
 
             if os.path.samefile(existing_patch_repo_path, patch_repo_path):
                 raise exc.AlreadyLinkedToSamePatchRepo(
@@ -428,16 +426,20 @@ class WorkingRepo(git.Repo):
 
         self._commit_to_patch_repo(commit_msg)
 
-    def rollback(self):
+    def rollback(self, lose_uncommitted=False):
         """Rollback to that last upstream commit."""
-        if self.uncommitted_changes():
+        if self.uncommitted_changes() and not lose_uncommitted:
             raise exc.UncommittedChanges
 
         based_on = self._last_upstream_commit_hash()
+
         if based_on:
+            # If any patches successfully applied, roll them back
             self.reset(based_on, hard=True)
         else:
-            raise exc.NoPatchesApplied
+            # If no patches applied successfully applied, then just trash the
+            # in-progress changes
+            self.reset('HEAD', hard=True)
 
     def _create_patches(self, since):
         """

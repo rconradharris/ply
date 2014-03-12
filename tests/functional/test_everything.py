@@ -36,7 +36,7 @@ class FunctionalTestCase(unittest.TestCase):
         self.assert_readme('Now is the time for all good men to come to'
                            ' the aid of there country.')
 
-        self.upstream_hash = self.get_working_repo_commit_hash()
+        self.upstream_hash = self.working_repo.get_head_commit_hash()
 
     def _create_patch_repo(self, path):
         os.mkdir(path)
@@ -58,9 +58,6 @@ class FunctionalTestCase(unittest.TestCase):
     def tearDown(self):
         if not self.KEEP_SANDBOX:
             shutil.rmtree(self.SANDBOX)
-
-    def get_working_repo_commit_hash(self, count=1):
-        return self.working_repo.log(count=count, pretty='%H').strip()
 
     def assert_readme(self, expected):
         with open(self.readme_path) as f:
@@ -148,7 +145,7 @@ class FunctionalTestCase(unittest.TestCase):
                           ' aid of there country. Fin.',
                           commit_msg='Trunk changed')
 
-        new_upstream_hash = self.working_repo.log(count=1, pretty='%H').strip()
+        new_upstream_hash = self.working_repo.get_head_commit_hash()
 
         with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
             self.working_repo.restore()
@@ -256,7 +253,11 @@ class FunctionalTestCase(unittest.TestCase):
                                    no_series_entry=set([])))
         self.assertEqual(expected, self.patch_repo.check())
 
-    def test_abort(self):
+    def test_abort_no_patch_successfully_applied(self):
+        """If we abort and no other patches were successfully applied, then we
+        should end up back at the last-upstream hash naturally by just
+        throwing away the conflicting patch.
+        """
         self.write_readme('Now is the time for all good men to come to the'
                           ' aid of their country.',
                           commit_msg='There -> Their')
@@ -266,6 +267,8 @@ class FunctionalTestCase(unittest.TestCase):
 
         self.write_readme('Completely different line.',
                           commit_msg='Upstream changed')
+
+        new_upstream_hash = self.working_repo.get_head_commit_hash()
 
         with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
             self.working_repo.restore()
@@ -277,6 +280,41 @@ class FunctionalTestCase(unittest.TestCase):
         self.assertEqual('no-patches-applied', self.working_repo.status)
 
         self.assert_readme('Completely different line.')
+
+        self.assertEqual(new_upstream_hash,
+                         self.working_repo.get_head_commit_hash())
+
+    def test_abort_patch_successfully_applied(self):
+        """If we abort after a successfully applied patch, then we must
+        rollback in order to be back at the last-upstream-hash.
+        """
+        self.write_readme('A\nB\nC', commit_msg='Adding A, B, and C')
+        new_upstream_hash = self.working_repo.get_head_commit_hash()
+
+        self.write_readme('a\nB\nC', commit_msg='A -> a')
+        self.write_readme('a\nb\nC', commit_msg='B -> b')
+        self.write_readme('a\nb\nc', commit_msg='C -> c')
+
+        self.working_repo.save(new_upstream_hash)
+        self.working_repo.rollback()
+
+        self.write_readme('A\nB\nD', commit_msg='Upstream changed: C -> D')
+
+        newer_upstream_hash = self.working_repo.get_head_commit_hash()
+
+        with self.assertRaises(plypatch.git.exc.PatchDidNotApplyCleanly):
+            self.working_repo.restore()
+
+        self.assertEqual('restore-in-progress', self.working_repo.status)
+
+        self.working_repo.abort()
+
+        self.assertEqual('no-patches-applied', self.working_repo.status)
+
+        self.assert_readme('A\nB\nD')
+
+        self.assertEqual(newer_upstream_hash,
+                         self.working_repo.get_head_commit_hash())
 
     def test_ply_based_on_annotation(self):
         """The Ply-Based-On annotation in the patch repo should always point
@@ -402,7 +440,8 @@ class FunctionalTestCase(unittest.TestCase):
                 plypatch.git.exc.PatchDidNotApplyCleanly) as cm:
             working_repo2.restore()
 
-        self.assertNotEqual('PatchBlobSHA1Invalid', cm.exception.__class__.__name__)
+        self.assertNotEqual('PatchBlobSHA1Invalid',
+                            cm.exception.__class__.__name__)
 
     def test_restore_after_conflict_should_raise_restore_in_progress(self):
         self.write_readme('Now is the time for all good men to come to the'

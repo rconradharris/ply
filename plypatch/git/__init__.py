@@ -257,3 +257,6 @@ class Repo(object):
 
     def rebase_in_progress(self):
         return os.path.exists(os.path.join(self.path, '.git', 'rebase-apply'))
+
+    def get_head_commit_hash(self):
+        return self.log(cmd_arg='HEAD', pretty='%H', count=1).strip()

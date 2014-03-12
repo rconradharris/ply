@@ -181,8 +181,6 @@ class RollbackCommand(CLICommand):
         """Rollback to the last upstream commit"""
         try:
             self.working_repo.rollback()
-        except plypatch.exc.NoPatchesApplied:
-            die('Cannot rollback, no patches applied')
         except plypatch.exc.UncommittedChanges:
             die_on_uncommitted_changes()
 
