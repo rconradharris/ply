@@ -175,13 +175,6 @@ class WorkingRepo(git.Repo):
 
         return applied
 
-    def _store_patch_files(self, patch_names, filenames,
-                           parent_patch_name=None):
-        """Store a set of patch files in the patch-repo."""
-        source_paths = [os.path.join(self.path, f) for f in filenames]
-        return self.patch_repo.add_patches(
-            patch_names, source_paths, parent_patch_name=parent_patch_name)
-
     def _commit_to_patch_repo(self, commit_msg):
         if not self.patch_repo.uncommitted_changes():
             return
@@ -604,7 +597,6 @@ class PatchRepo(git.Repo):
     def add_patches(self, patch_names, source_paths, parent_patch_name=None):
         """Add patches to the patch-repo, including add them to the series
         file in the appropriate location.
-
 
         `parent_patch_name` represents where in the `series` file we should
         insert the new patch set.
