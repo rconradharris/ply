@@ -1,9 +1,9 @@
 import collections
 import contextlib
-import filecmp
 import os
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 
@@ -88,6 +88,9 @@ def _remove_trailing_extra_blank_lines_from_subject(lines):
 
 
 def _fixup_patch(from_file, to_file):
+    """The output of git-am would be very chatty if we used it directly, so we
+    normalize parts of the patch file that unecessarily change.
+    """
     lines = from_file.readlines()
     _replace_from_sha1(lines)
     _replace_git_version(lines)
@@ -473,18 +476,29 @@ class WorkingRepo(git.Repo):
         filenames = self.format_patch(
             since, keep_subject=True, no_numbered=True, no_stat=True)
 
-        # Rewrite first-line 'From <commit-hash>' -> 'From ply'
+        stripped_filenames = []
+
         for filename in filenames:
-            from_filename = os.path.join(self.path, filename)
+            from_path = os.path.join(self.path, filename)
             with tempfile.NamedTemporaryFile(delete=False) as to_file:
-                with open(from_filename) as from_file:
+                with open(from_path) as from_file:
                     _fixup_patch(from_file, to_file)
 
-            shutil.move(to_file.name, from_filename)
+            to_path = to_file.name
+
+            # Strip 0001- prefix that git format-patch provides. Like
+            # `quilt`, `ply` uses a `series` for patch ordering.
+            stripped_filename = filename.split('-', 1)[1]
+            stripped_filenames.append(stripped_filename)
+
+            stripped_path = os.path.join(self.path, stripped_filename)
+            shutil.move(to_path, stripped_path)
+            os.unlink(from_path)
 
         parent_patch_name = self._get_commit_hash_and_patch_name(
             since)[1]
-        return filenames, parent_patch_name
+
+        return stripped_filenames, parent_patch_name
 
     def save(self, since=None, prefix=None):
         """Save a series of commits as patches into the patch-repo."""
@@ -510,10 +524,7 @@ class WorkingRepo(git.Repo):
 
             # Otherwise... take it from the `git format-patch` filename
             if not patch_name:
-                # Strip 0001- prefix that git format-patch provides. Like
-                # `quilt`, `ply` uses a `series` for patch ordering.
-                patch_name = filename.split('-', 1)[1]
-
+                patch_name = filename
                 # Add our own subdirectory prefix, if needed
                 if prefix:
                     patch_name = os.path.join(prefix, patch_name)
@@ -521,15 +532,14 @@ class WorkingRepo(git.Repo):
             patch_names.append(patch_name)
 
         source_paths = [os.path.join(self.path, f) for f in filenames]
-        added, updated = self.patch_repo.add_patches(
+        added, updated, skipped = self.patch_repo.add_patches(
             patch_names, source_paths, parent_patch_name=parent_patch_name)
 
-        # Remove vestigial patches (anything in the series file after the last
-        # recognized patch name)
-        series = self.patch_repo.series
-        last_idx = series.index(patch_names[-1])
-        vestigial = series[last_idx + 1:len(series)]
-        removed = self.patch_repo.remove_patches(vestigial)
+        series = set(self.patch_repo.series)
+        to_remove = series - added - updated - skipped
+
+        # Remove any patches that are no longer accounted for
+        removed = self.patch_repo.remove_patches(to_remove)
 
         # Rollback and reapply patches so that working repo has
         # patch-annotations for latest saved patches
@@ -614,6 +624,59 @@ class PatchRepo(git.Repo):
 
         self.add('series')
 
+    def _is_patch_meaningful(self, source_path, dest_path):
+        """We don't want to include files where only 'index' or context lines
+        changed because that would lead to *very* chatty diffs. So if we detect a
+        file diff is entirely made up of these changes, then we can just skip it.
+
+        Valid changes are:
+
+            - Lines added or removed from patch file
+            - Commit message changed
+            - File permissions changed
+        """
+        if not os.path.exists(dest_path):
+            return True
+
+        proc = subprocess.Popen(['diff', source_path, dest_path],
+                                stdout=subprocess.PIPE)
+        stdout = proc.communicate()[0]
+
+        if proc.returncode == 0:
+            return False
+
+        if proc.returncode != 1:
+            raise Exception('Unknown returncode from diff: %s' % proc.returncode)
+
+        lines = stdout.split('\n')
+
+        last_index_perms = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+            elif line[0] not in ('<', '>'):
+                # Diff meta information isn't meaninful
+                continue
+            elif line.startswith('< @@') or line.startswith('> @@'):
+                # Context lines aren't meaningful on their own
+                continue
+            elif line.startswith('< index'):
+                # Save perms so we can compare to see if changed
+                last_index_perms = line.split()[-1]
+            elif line.startswith('> index'):
+                # Index lines are only meaningful on their own if the file
+                # changed permissions
+                perms = line.split()[-1]
+                if perms != last_index_perms:
+                    return True
+            else:
+                print "meaningful => ", line
+                return True
+
+        return False
+
     def add_patches(self, patch_names, source_paths, parent_patch_name=None):
         """Add patches to the patch-repo, including add them to the series
         file in the appropriate location.
@@ -626,6 +689,7 @@ class PatchRepo(git.Repo):
         """
         added = set()
         updated = set()
+        skipped = set()
 
         # Move patches into patch-repo
         for patch_name, source_path in zip(patch_names, source_paths):
@@ -640,11 +704,12 @@ class PatchRepo(git.Repo):
                 # For simplicity, we regenerate all patches, however some will
                 # be the same, so perform a file compare so we keep accurate
                 # counts of which were truly updatd
-                if filecmp.cmp(source_path, dest_path):
-                    os.unlink(source_path)
-                else:
+                if self._is_patch_meaningful(source_path, dest_path):
                     updated.add(patch_name)
                     shutil.move(source_path, dest_path)
+                else:
+                    os.unlink(source_path)
+                    skipped.add(patch_name)
             else:
                 added.add(patch_name)
                 shutil.move(source_path, dest_path)
@@ -666,7 +731,7 @@ class PatchRepo(git.Repo):
 
                 entries.insert(base + idx, patch_name)
 
-        return added, updated
+        return added, updated, skipped
 
     def remove_patches(self, patch_names):
         removed = set()
