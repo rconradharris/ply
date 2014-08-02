@@ -68,11 +68,31 @@ def _remove_ply_patch_annotation(lines):
         del lines[idx]
 
 
+def _remove_trailing_extra_blank_lines_from_subject(lines):
+    """Different versions of git will output different amounts of trailing
+    whitespace at the end of a subject headers, so we normalize it by only
+    allowing a single trailing blank line.
+    """
+    for idx, line in enumerate(lines):
+        if line.startswith('diff --git'):
+            break
+    else:
+        return
+
+    if idx < 2:
+        return
+
+    # If we have two blanks above first `diff --git` remove one of them
+    if not lines[idx - 1].strip() and not lines[idx - 2].strip():
+        del lines[idx - 1]
+
+
 def _fixup_patch(from_file, to_file):
     lines = from_file.readlines()
     _replace_from_sha1(lines)
     _replace_git_version(lines)
     _remove_ply_patch_annotation(lines)
+    _remove_trailing_extra_blank_lines_from_subject(lines)
     to_file.write(''.join(lines))
 
 

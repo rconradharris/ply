@@ -40,7 +40,6 @@ From: Rick Harris <rconradharris@gmail.com>
 Date: Mon, 17 Jun 2013 11:35:48 -0500
 Subject: Bar
 
-
 diff --git a/README b/README
 index bc56c4d..ebd7525 100644
 --- a/README

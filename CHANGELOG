@@ -1,3 +1,9 @@
+0.3.8
+=====
+
+- FIXED: Normalize whitespace in subject (#16)
+
+
 0.3.7
 =====
 
