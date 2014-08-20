@@ -38,3 +38,7 @@ class UncommittedChanges(PlyException):
 
 class RestoreInProgress(PlyException):
     pass
+
+
+class GitConfigRequired(PlyException):
+    pass

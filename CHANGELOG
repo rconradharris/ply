@@ -2,6 +2,7 @@
 =====
 
 - FIXED: Normalize whitespace in subject (#16)
+- ADDED: Check to ensure 'user.name' and 'user.email' configs are set (#25)
 
 
 0.3.7

@@ -164,6 +164,8 @@ class RestoreCommand(CLICommand):
         working-repo"""
         try:
             self.working_repo.restore()
+        except plypatch.exc.GitConfigRequired as e:
+            die("Required git config '%s' is unset." % e)
         except plypatch.exc.RestoreInProgress:
             die_on_restore_in_progress()
         except plypatch.exc.UncommittedChanges:

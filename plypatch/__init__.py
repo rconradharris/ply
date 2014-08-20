@@ -353,6 +353,21 @@ class WorkingRepo(git.Repo):
 
         return updated, removed
 
+    def _get_config(self, key):
+        try:
+            return self.config('get', config_key=key)[0]
+        except git.exc.GitException:
+            return None
+
+    def _ensure_name_and_email_set(self):
+        email = self._get_config('user.email')
+        if not email:
+            raise exc.GitConfigRequired('user.email')
+
+        name = self._get_config('user.name')
+        if not name:
+            raise exc.GitConfigRequired('user.name')
+
     def restore(self, three_way_merge=True, commit_msg=None,
                 fetch_remotes=True):
         """Applies a series of patches to the working repo's current
@@ -366,6 +381,8 @@ class WorkingRepo(git.Repo):
         # been successfully applied, skipped, or we've aborted the restore.
         #
         #####################################################################
+        self._ensure_name_and_email_set()
+
         if self.rebase_in_progress():
             raise exc.RestoreInProgress
 
