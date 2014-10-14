@@ -310,12 +310,13 @@ class WorkingRepo(git.Repo):
         one time after all of the patches have been applied.
         """
         patch_name = self._resolve_conflict('resolved')
-
         filenames, parent_patch_name = self._create_patches('HEAD^')
+        if len(filenames) > 1:
+            raise Exception("Too many patches generated")
 
-        source_paths = [os.path.join(self.path, f) for f in filenames]
-        self.patch_repo.add_patches(
-            [patch_name], source_paths, parent_patch_name=parent_patch_name)
+        source_path = os.path.join(self.path, filenames[0])
+        patches = [(patch_name, source_path)]
+        self.patch_repo.add_patches(patches, parent_patch_name=parent_patch_name)
 
         self._add_patch_annotation(patch_name)
         self.restore(fetch_remotes=False)  # Apply remaining patches
@@ -519,7 +520,7 @@ class WorkingRepo(git.Repo):
 
         filenames, parent_patch_name = self._create_patches(since)
 
-        patch_names = []
+        patches = []
         for filename in filenames:
             # Strip 0001- prefix that git format-patch provides. Like
             # `quilt`, `ply` uses a `series` for patch ordering.
@@ -529,11 +530,11 @@ class WorkingRepo(git.Repo):
             if prefix:
                 patch_name = os.path.join(prefix, patch_name)
 
-            patch_names.append(patch_name)
+            source_path = os.path.join(self.path, filename)
+            patches.append((patch_name, source_path))
 
-        source_paths = [os.path.join(self.path, f) for f in filenames]
         added, updated, skipped = self.patch_repo.add_patches(
-            patch_names, source_paths, parent_patch_name=parent_patch_name)
+            patches, parent_patch_name=parent_patch_name)
 
         # Remove any patches that are no longer accounted for
         series = set(self.patch_repo.series)
@@ -623,7 +624,7 @@ class PatchRepo(git.Repo):
 
         self.add('series')
 
-    def add_patches(self, patch_names, source_paths, parent_patch_name=None):
+    def add_patches(self, patches, parent_patch_name=None):
         """Add patches to the patch-repo, including add them to the series
         file in the appropriate location.
 
@@ -638,7 +639,7 @@ class PatchRepo(git.Repo):
         skipped = set()
 
         # Move patches into patch-repo
-        for patch_name, source_path in zip(patch_names, source_paths):
+        for patch_name, source_path in patches:
             # Ensure destination exists (in case a prefix was supplied)
             dirname = os.path.dirname(patch_name)
             dest_path = os.path.join(self.path, dirname)
@@ -667,7 +668,7 @@ class PatchRepo(git.Repo):
             else:
                 base = 0
 
-            for idx, patch_name in enumerate(patch_names):
+            for idx, (patch_name, _) in enumerate(patches):
                 self.add(patch_name)
 
                 if patch_name in entries:
