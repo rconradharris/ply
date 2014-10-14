@@ -532,15 +532,13 @@ class WorkingRepo(git.Repo):
             patch_names.append(patch_name)
 
         source_paths = [os.path.join(self.path, f) for f in filenames]
-        added, updated = self.patch_repo.add_patches(
+        added, updated, skipped = self.patch_repo.add_patches(
             patch_names, source_paths, parent_patch_name=parent_patch_name)
 
-        # Remove vestigial patches (anything in the series file after the last
-        # recognized patch name)
-        series = self.patch_repo.series
-        last_idx = series.index(patch_names[-1])
-        vestigial = series[last_idx + 1:len(series)]
-        removed = self.patch_repo.remove_patches(vestigial)
+        # Remove any patches that are no longer accounted for
+        series = set(self.patch_repo.series)
+        removed = series - added - updated - skipped
+        self.patch_repo.remove_patches(removed)
 
         # Rollback and reapply patches so that working repo has
         # patch-annotations for latest saved patches
@@ -637,6 +635,7 @@ class PatchRepo(git.Repo):
         """
         added = set()
         updated = set()
+        skipped = set()
 
         # Move patches into patch-repo
         for patch_name, source_path in zip(patch_names, source_paths):
@@ -652,6 +651,7 @@ class PatchRepo(git.Repo):
                 # be the same, so perform a file compare so we keep accurate
                 # counts of which were truly updatd
                 if filecmp.cmp(source_path, dest_path):
+                    skipped.add(patch_name)
                     os.unlink(source_path)
                 else:
                     updated.add(patch_name)
@@ -677,18 +677,15 @@ class PatchRepo(git.Repo):
 
                 entries.insert(base + idx, patch_name)
 
-        return added, updated
+        return added, updated, skipped
 
     def remove_patches(self, patch_names):
-        removed = set()
         with self._mutate_series_file() as entries:
             for patch_name in patch_names:
                 # If there were any local changes and it's not in the series
                 # file, we still want to remove it, hence force=True
                 self.rm(patch_name, force=True)
                 entries.remove(patch_name)
-                removed.add(patch_name)
-        return removed
 
     def initialize(self):
         """Initialize the patch repo (create series file and git-init)."""
