@@ -241,7 +241,7 @@ class Repo(object):
         subprocess.check_call(args)
 
     @cmd
-    def rm(self, filename, quiet=None):
+    def rm(self, filename, quiet=None, force=False):
         if quiet is None:
             quiet = self.quiet
 
@@ -249,6 +249,8 @@ class Repo(object):
 
         if quiet:
             args.append('-q')
+        if force:
+            args.append('-f')
 
         subprocess.check_call(args)
 

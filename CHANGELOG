@@ -1,3 +1,6 @@
+- FIXED: Better handle patch renames by passing -f to git-rm (#26)
+
+
 0.3.8
 =====
 

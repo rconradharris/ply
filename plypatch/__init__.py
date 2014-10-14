@@ -689,7 +689,9 @@ class PatchRepo(git.Repo):
         removed = set()
         with self._mutate_series_file() as entries:
             for patch_name in patch_names:
-                self.rm(patch_name)
+                # If there were any local changes and it's not in the series
+                # file, we still want to remove it, hence force=True
+                self.rm(patch_name, force=True)
                 entries.remove(patch_name)
                 removed.add(patch_name)
         return removed
