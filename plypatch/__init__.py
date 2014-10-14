@@ -521,19 +521,13 @@ class WorkingRepo(git.Repo):
 
         patch_names = []
         for filename in filenames:
-            # If commit already has annotation, use that patch-name
-            with open(os.path.join(self.path, filename)) as f:
-                patch_name = self._get_patch_annotation(f.read())
+            # Strip 0001- prefix that git format-patch provides. Like
+            # `quilt`, `ply` uses a `series` for patch ordering.
+            patch_name = filename.split('-', 1)[1]
 
-            # Otherwise... take it from the `git format-patch` filename
-            if not patch_name:
-                # Strip 0001- prefix that git format-patch provides. Like
-                # `quilt`, `ply` uses a `series` for patch ordering.
-                patch_name = filename.split('-', 1)[1]
-
-                # Add our own subdirectory prefix, if needed
-                if prefix:
-                    patch_name = os.path.join(prefix, patch_name)
+            # Add our own subdirectory prefix, if needed
+            if prefix:
+                patch_name = os.path.join(prefix, patch_name)
 
             patch_names.append(patch_name)
 

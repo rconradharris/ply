@@ -1,3 +1,6 @@
+- FIXED: Better handle patch renames by regenerating patch-name on each save
+         (#27)
+
 - FIXED: Better handle patch renames by passing -f to git-rm (#26)
 
 
