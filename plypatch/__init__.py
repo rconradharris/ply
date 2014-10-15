@@ -95,7 +95,17 @@ def _fixup_patch(from_file, to_file):
     to_file.write(''.join(lines))
 
 
-class WorkingRepo(git.Repo):
+
+class Repo(git.Repo):
+    def _add_annotation(self, prefix, value):
+        """Add annotation to the last commit."""
+        commit_msg = self.log(count=1, pretty='%B')
+        if prefix not in commit_msg:
+            annotation = '%s: %s' % (prefix, value)
+            self.commit(msgs=[commit_msg, annotation], amend=True)
+
+
+class WorkingRepo(Repo):
     """Represents our local fork of the upstream repository.
 
     This is where we will create new patches (save) or apply previous patches
@@ -105,10 +115,7 @@ class WorkingRepo(git.Repo):
 
     def _add_patch_annotation(self, patch_name):
         """Add a patch annotation to the last commit."""
-        commit_msg = self.log(count=1, pretty='%B')
-        if 'Ply-Patch' not in commit_msg:
-            commit_msg += '\n\nPly-Patch: %s' % patch_name
-            self.commit(commit_msg, amend=True)
+        self._add_annotation('Ply-Patch', patch_name)
 
     def _get_patch_annotation(self, description):
         """Return the Ply-Patch annotation if present.
@@ -193,14 +200,6 @@ class WorkingRepo(git.Repo):
                 break
 
         return applied
-
-    def _commit_to_patch_repo(self, commit_msg):
-        if not self.patch_repo.uncommitted_changes():
-            return
-
-        based_on = self._last_upstream_commit_hash()
-        commit_msg += '\n\nPly-Based-On: %s' % based_on
-        self.patch_repo.commit(commit_msg)
 
     @property
     def patch_repo_path(self):
@@ -455,7 +454,12 @@ class WorkingRepo(git.Repo):
             commit_msg = 'Refreshing patches: %d updated, %d removed' % (
                 updated, removed)
 
-        self._commit_to_patch_repo(commit_msg)
+        # Commit to patch repo
+        if not self.patch_repo.uncommitted_changes():
+            return
+        based_on = self._last_upstream_commit_hash()
+        self.patch_repo.commit(msgs=[commit_msg])
+        self.patch_repo._add_annotation('Ply-Based-On', based_on)
 
     def rollback(self, lose_uncommitted=False):
         """Rollback to that last upstream commit."""
@@ -558,7 +562,7 @@ class WorkingRepo(git.Repo):
         return self.patch_repo.check()
 
 
-class PatchRepo(git.Repo):
+class PatchRepo(Repo):
     """Represents a git repo containing versioned patch files."""
 
     def check(self):
@@ -720,7 +724,7 @@ class PatchRepo(git.Repo):
                 pass
 
             self.add('series')
-            self.commit('Ply init')
+            self.commit(msgs=['Ply init'])
 
     @property
     def series_path(self):

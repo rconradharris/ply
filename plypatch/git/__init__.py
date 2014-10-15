@@ -94,14 +94,17 @@ class Repo(object):
         subprocess.check_call(['git', 'clone', path, self.path])
 
     @cmd
-    def commit(self, msg, all=False, amend=False, use_commit_object=None,
-               quiet=None):
+    def commit(self, msgs=None, all=False, amend=False,
+               use_commit_object=None, quiet=None):
+        if msgs is None:
+            msgs = []
+
         if quiet is None:
             quiet = self.quiet
 
         args = ['git', 'commit']
 
-        if msg is not None:
+        for msg in msgs:
             args.extend(['-m', '%s' % msg])
 
         if all:

@@ -69,7 +69,7 @@ class FunctionalTestCase(unittest.TestCase):
 
         if commit_msg:
             self.working_repo.add('README')
-            self.working_repo.commit(commit_msg)
+            self.working_repo.commit(msgs=[commit_msg])
 
     def assert_based_on(self, expected):
         commit_msg = self.patch_repo.log(count=1, pretty='%B').strip()
