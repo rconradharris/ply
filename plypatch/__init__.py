@@ -312,12 +312,11 @@ class WorkingRepo(git.Repo):
         one time after all of the patches have been applied.
         """
         patch_name = self._resolve_conflict('resolved')
-        filenames, parent_patch_name = self._create_patches('HEAD^')
-        if len(filenames) > 1:
+        source_paths, parent_patch_name = self._create_patches('HEAD^')
+        if len(source_paths) > 1:
             raise Exception("Too many patches generated")
 
-        source_path = os.path.join(self.path, filenames[0])
-        patches = [(patch_name, source_path)]
+        patches = [(patch_name, source_paths[0])]
         self.patch_repo.sync_patches(patches, parent_patch_name)
 
         self._add_patch_annotation(patch_name)
@@ -494,17 +493,24 @@ class WorkingRepo(git.Repo):
             since, keep_subject=True, no_numbered=True, no_stat=True)
 
         # Rewrite first-line 'From <commit-hash>' -> 'From ply'
+        source_paths = []
         for filename in filenames:
-            from_filename = os.path.join(self.path, filename)
+            from_path = os.path.join(self.path, filename)
             with tempfile.NamedTemporaryFile(delete=False) as to_file:
-                with open(from_filename) as from_file:
+                with open(from_path) as from_file:
                     _fixup_patch(from_file, to_file)
 
-            shutil.move(to_file.name, from_filename)
+            # Strip 0001- prefix that git-format-patch uses
+            source_path = os.path.join(self.path, filename.split('-', 1)[1])
+            shutil.move(to_file.name, source_path)
+            os.unlink(from_path)
+
+            source_paths.append(source_path)
 
         parent_patch_name = self._get_commit_hash_and_patch_name(
             since)[1]
-        return filenames, parent_patch_name
+
+        return source_paths, parent_patch_name
 
     def save(self, since=None, prefix=None):
         """Save a series of commits as patches into the patch-repo."""
@@ -520,19 +526,14 @@ class WorkingRepo(git.Repo):
         if '..' in since:
             raise ValueError(".. not supported at the moment")
 
-        filenames, parent_patch_name = self._create_patches(since)
+        source_paths, parent_patch_name = self._create_patches(since)
 
         patches = []
-        for filename in filenames:
-            # Strip 0001- prefix that git format-patch provides. Like
-            # `quilt`, `ply` uses a `series` for patch ordering.
-            patch_name = filename.split('-', 1)[1]
-
+        for source_path in source_paths:
+            patch_name = os.path.basename(source_path)
             # Add our own subdirectory prefix, if needed
             if prefix:
                 patch_name = os.path.join(prefix, patch_name)
-
-            source_path = os.path.join(self.path, filename)
             patches.append((patch_name, source_path))
 
         added, updated, skipped, removed = self.patch_repo.sync_patches(

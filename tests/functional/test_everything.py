@@ -373,11 +373,17 @@ class FunctionalTestCase(unittest.TestCase):
                            ' the aid of their country!')
 
     def test_restore_stats_for_new_patch(self):
+        self.assertEqual([], glob.glob(os.path.join(self.working_repo.path,
+                                                    '*.patch')))
+
         self.write_readme('Now is the time for all good men to come to the'
                           ' aid of their country.',
                           commit_msg='There -> Their')
 
         self.working_repo.save(self.upstream_hash)
+
+        self.assertEqual([], glob.glob(os.path.join(self.working_repo.path,
+                                                    '*.patch')))
 
         self.write_readme('Now is the time for all good men to come to the'
                           ' aid of their country!',
