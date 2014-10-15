@@ -40,3 +40,13 @@ def recursive_glob(path, glob):
         for filename in fnmatch.filter(filenames, glob):
             matches.append(os.path.join(root, filename))
     return matches
+
+
+def path_exists_case_sensitive(path):
+    """Determine whether a path exists in a case-sensitive manner.
+
+    This used since Mac's HFS+ filesystem, by default, is case-insensitive.
+    """
+    basename = os.path.basename(path)
+    dirname = os.path.dirname(path)
+    return basename in os.listdir(dirname)

@@ -629,7 +629,7 @@ class PatchRepo(git.Repo):
 
         for patch_name, source_path in patches:
             dest_path = os.path.join(self.path, patch_name)
-            if os.path.exists(dest_path):
+            if utils.path_exists_case_sensitive(dest_path):
                 # For simplicity, we regenerate all patches, however some will
                 # be the same, so perform a file compare so we keep accurate
                 # counts of which were truly updatd
@@ -680,6 +680,10 @@ class PatchRepo(git.Repo):
             if patch_name in source_paths:
                 os.unlink(source_paths[patch_name])
 
+        # Remove any patches that should no longer be present
+        for patch_name in removed:
+            self.rm(patch_name, force=True)
+
         # Move the added and updated patches
         for patch_name in added | updated:
             # Ensure destination exists (in case a prefix was supplied)
@@ -691,10 +695,6 @@ class PatchRepo(git.Repo):
             shutil.move(source_paths[patch_name],
                         dest_paths[patch_name])
             self.add(patch_name)
-
-        # Remove any patches that should no longer be present
-        for patch_name in removed:
-            self.rm(patch_name, force=True)
 
         # Update series file
         with self._mutate_series_file() as entries:

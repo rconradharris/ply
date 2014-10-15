@@ -1,13 +1,11 @@
-- FIXED: Better handle patch renames by regenerating patch-name on each save
-         (#27)
-
-- FIXED: Better handle patch renames by passing -f to git-rm (#26)
+- FIXED: Better handle patch renaming (#26, #27)
 
 
 0.3.8
 =====
 
 - FIXED: Normalize whitespace in subject (#16)
+
 - ADDED: Check to ensure 'user.name' and 'user.email' configs are set (#25)
 
 
