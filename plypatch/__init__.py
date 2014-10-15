@@ -216,12 +216,15 @@ class WorkingRepo(git.Repo):
         """Return a patch repo object associated with this working repo via
         the ply.patchrepo git config.
         """
-        if not self.patch_repo_path:
-            raise exc.NoLinkedPatchRepo
+        if not hasattr(self, '_patch_repo'):
+            if not self.patch_repo_path:
+                raise exc.NoLinkedPatchRepo
 
-        return PatchRepo(self.patch_repo_path,
-                         quiet=self.quiet,
-                         supress_warnings=self.supress_warnings)
+            self._patch_repo =  PatchRepo(
+                             self.patch_repo_path,
+                             quiet=self.quiet,
+                             supress_warnings=self.supress_warnings)
+        return self._patch_repo
 
     @property
     def _patch_conflict_path(self):
@@ -298,7 +301,7 @@ class WorkingRepo(git.Repo):
         change was made upstream.
         """
         patch_name = self._resolve_conflict('skip')
-        self.patch_repo.remove_patches([patch_name])
+        self.patch_repo.remove_patch(patch_name)
         self.restore(fetch_remotes=False)  # Apply remaining patches
 
     def resolve(self):
@@ -316,7 +319,7 @@ class WorkingRepo(git.Repo):
 
         source_path = os.path.join(self.path, filenames[0])
         patches = [(patch_name, source_path)]
-        self.patch_repo.add_patches(patches, parent_patch_name=parent_patch_name)
+        self.patch_repo.sync_patches(patches, parent_patch_name=parent_patch_name)
 
         self._add_patch_annotation(patch_name)
         self.restore(fetch_remotes=False)  # Apply remaining patches
@@ -422,7 +425,7 @@ class WorkingRepo(git.Repo):
                 self._update_restore_stats(delta_updated=1)
                 raise
             except git.exc.PatchAlreadyApplied:
-                self.patch_repo.remove_patches([patch_name])
+                self.patch_repo.remove_patch(patch_name)
                 self.warn("Patch '%s' appears to be upstream, removing from"
                           " patch-repo" % patch_name)
                 self._update_restore_stats(delta_removed=1)
@@ -533,13 +536,8 @@ class WorkingRepo(git.Repo):
             source_path = os.path.join(self.path, filename)
             patches.append((patch_name, source_path))
 
-        added, updated, skipped = self.patch_repo.add_patches(
+        added, updated, skipped, removed = self.patch_repo.sync_patches(
             patches, parent_patch_name=parent_patch_name)
-
-        # Remove any patches that are no longer accounted for
-        series = set(self.patch_repo.series)
-        removed = series - added - updated - skipped
-        self.patch_repo.remove_patches(removed)
 
         # Rollback and reapply patches so that working repo has
         # patch-annotations for latest saved patches
@@ -624,28 +622,12 @@ class PatchRepo(git.Repo):
 
         self.add('series')
 
-    def add_patches(self, patches, parent_patch_name=None):
-        """Add patches to the patch-repo, including add them to the series
-        file in the appropriate location.
-
-        `parent_patch_name` represents where in the `series` file we should
-        insert the new patch set.
-
-        `None` indicates that the patch-set doesn't have a parent so it should
-        be inserted at the beginning of the series file.
-        """
+    def _determine_what_changed(self, patches):
         added = set()
         updated = set()
         skipped = set()
 
-        # Move patches into patch-repo
         for patch_name, source_path in patches:
-            # Ensure destination exists (in case a prefix was supplied)
-            dirname = os.path.dirname(patch_name)
-            dest_path = os.path.join(self.path, dirname)
-            if dirname and not os.path.exists(dest_path):
-                os.makedirs(dest_path)
-
             dest_path = os.path.join(self.path, patch_name)
             if os.path.exists(dest_path):
                 # For simplicity, we regenerate all patches, however some will
@@ -653,13 +635,57 @@ class PatchRepo(git.Repo):
                 # counts of which were truly updatd
                 if filecmp.cmp(source_path, dest_path):
                     skipped.add(patch_name)
-                    os.unlink(source_path)
                 else:
                     updated.add(patch_name)
-                    shutil.move(source_path, dest_path)
             else:
                 added.add(patch_name)
-                shutil.move(source_path, dest_path)
+
+        series = set(self.series)
+        removed = series - added - updated - skipped
+
+        return added, updated, skipped, removed
+
+    def sync_patches(self, patches, parent_patch_name=None):
+        """Sync patches into working repo, adding, updating, and removing
+        patches as necessary.
+
+        `patches` is a list of tuples representing `patch_name` and
+        `source_path`.
+
+        `parent_patch_name` represents where in the `series` file we should
+        insert the new patch set.
+
+        `None` indicates that the patch-set doesn't have a parent so it should
+        be inserted at the beginning of the series file.
+        """
+        added, updated, skipped, removed = self._determine_what_changed(
+                patches)
+
+        source_paths = {}
+        dest_paths = {}
+        for patch_name_, source_path_ in patches:
+            source_paths[patch_name_] = source_path_
+            dest_paths[patch_name_] = os.path.join(self.path, patch_name_)
+
+        # Toss the skipped patches
+        for patch_name in skipped:
+            os.unlink(source_paths[patch_name])
+
+        # Move the added and updated patches
+        for patch_name in added | updated:
+            # Ensure destination exists (in case a prefix was supplied)
+            dirname = os.path.dirname(patch_name)
+            dest_dir = os.path.join(self.path, dirname)
+            if dirname and not os.path.exists(dest_dir):
+                os.makedirs(dest_dir)
+
+            shutil.move(source_paths[patch_name],
+                        dest_paths[patch_name])
+            self.add(patch_name)
+
+        # Remove any patches that should no longer be present
+        for patch_name in removed:
+            self.rm(patch_name, force=True)
 
         # Update series file
         with self._mutate_series_file() as entries:
@@ -669,8 +695,6 @@ class PatchRepo(git.Repo):
                 base = 0
 
             for idx, (patch_name, _) in enumerate(patches):
-                self.add(patch_name)
-
                 if patch_name in entries:
                     # Already exists, reorder patch by removing it from
                     # current location and inserting it into the new location.
@@ -678,15 +702,17 @@ class PatchRepo(git.Repo):
 
                 entries.insert(base + idx, patch_name)
 
-        return added, updated, skipped
-
-    def remove_patches(self, patch_names):
-        with self._mutate_series_file() as entries:
-            for patch_name in patch_names:
-                # If there were any local changes and it's not in the series
-                # file, we still want to remove it, hence force=True
-                self.rm(patch_name, force=True)
+            for patch_name in removed:
                 entries.remove(patch_name)
+
+        return added, updated, skipped, removed
+
+    def remove_patch(self, patch_name):
+        with self._mutate_series_file() as entries:
+            # If there were any local changes and it's not in the series
+            # file, we still want to remove it, hence force=True
+            self.rm(patch_name, force=True)
+            entries.remove(patch_name)
 
     def initialize(self):
         """Initialize the patch repo (create series file and git-init)."""
