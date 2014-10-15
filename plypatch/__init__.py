@@ -222,6 +222,7 @@ class WorkingRepo(Repo):
                              self.patch_repo_path,
                              quiet=self.quiet,
                              supress_warnings=self.supress_warnings)
+
         return self._patch_repo
 
     @property
@@ -369,7 +370,7 @@ class WorkingRepo(Repo):
             raise exc.GitConfigRequired('user.name')
 
     def restore(self, three_way_merge=True, commit_msg=None,
-                fetch_remotes=True):
+                fetch_remotes=True, custom_commit_msg=False):
         """Applies a series of patches to the working repo's current
         branch.
         """
@@ -450,15 +451,21 @@ class WorkingRepo(Repo):
         if os.path.exists(self._restore_stats_path):
             os.unlink(self._restore_stats_path)
 
-        if not commit_msg:
-            commit_msg = 'Refreshing patches: %d updated, %d removed' % (
-                updated, removed)
-
         # Commit to patch repo
         if not self.patch_repo.uncommitted_changes():
             return
         based_on = self._last_upstream_commit_hash()
-        self.patch_repo.commit(msgs=[commit_msg])
+
+        if commit_msg:
+            msgs = [commit_msg]
+        else:
+            if custom_commit_msg:
+                msgs = []
+            else:
+                msgs = ['Refreshing patches: %d updated, %d removed' % (
+                        updated, removed)]
+
+        self.patch_repo.commit(msgs=msgs)
         self.patch_repo._add_annotation('Ply-Based-On', based_on)
 
     def rollback(self, lose_uncommitted=False):
@@ -515,7 +522,7 @@ class WorkingRepo(Repo):
 
         return source_paths, parent_patch_name
 
-    def save(self, since=None):
+    def save(self, since=None, custom_commit_msg=False):
         """Save a series of commits as patches into the patch-repo."""
         if self.uncommitted_changes() or self.patch_repo.uncommitted_changes():
             raise exc.UncommittedChanges
@@ -539,13 +546,17 @@ class WorkingRepo(Repo):
         num_patches = len(self.patch_repo.series)
         self.reset('HEAD~%d' % num_patches, hard=True)
 
-        commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
-            len(added), len(updated), len(removed))
+        if custom_commit_msg:
+            commit_msg = None
+        else:
+            commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
+                len(added), len(updated), len(removed))
 
         # We have to commit to the patch-repo AFTER rolling-back and
         # reapplying so that we have the patch-annotations necessary to figure
         # out the correct Ply-Based-On annotation in the patch-repo.
-        self.restore(commit_msg=commit_msg, fetch_remotes=False)
+        self.restore(commit_msg=commit_msg, fetch_remotes=False,
+                     custom_commit_msg=custom_commit_msg)
 
     @property
     def status(self):

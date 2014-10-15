@@ -1,6 +1,8 @@
 0.4.0
 =====
 
+- ADDED: -m, --message options to `ply save` and `ply restore`
+
 - REMOVED: -p, --prefix option from `ply save`
 
 - FIXED: Avoid unecessarily chatty diffs in `ply save`
