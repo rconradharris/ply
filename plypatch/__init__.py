@@ -1,6 +1,5 @@
 import collections
 import contextlib
-import filecmp
 import os
 import re
 import shutil
@@ -633,10 +632,10 @@ class PatchRepo(git.Repo):
                 # For simplicity, we regenerate all patches, however some will
                 # be the same, so perform a file compare so we keep accurate
                 # counts of which were truly updatd
-                if filecmp.cmp(source_path, dest_path):
-                    skipped.add(patch_name)
-                else:
+                if utils.meaningful_diff(source_path, dest_path):
                     updated.add(patch_name)
+                else:
+                    skipped.add(patch_name)
             else:
                 added.add(patch_name)
 
