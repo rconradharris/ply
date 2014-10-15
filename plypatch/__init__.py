@@ -319,7 +319,7 @@ class WorkingRepo(git.Repo):
 
         source_path = os.path.join(self.path, filenames[0])
         patches = [(patch_name, source_path)]
-        self.patch_repo.sync_patches(patches, parent_patch_name=parent_patch_name)
+        self.patch_repo.sync_patches(patches, parent_patch_name)
 
         self._add_patch_annotation(patch_name)
         self.restore(fetch_remotes=False)  # Apply remaining patches
@@ -537,7 +537,7 @@ class WorkingRepo(git.Repo):
             patches.append((patch_name, source_path))
 
         added, updated, skipped, removed = self.patch_repo.sync_patches(
-            patches, parent_patch_name=parent_patch_name)
+            patches, parent_patch_name)
 
         # Rollback and reapply patches so that working repo has
         # patch-annotations for latest saved patches
@@ -622,7 +622,7 @@ class PatchRepo(git.Repo):
 
         self.add('series')
 
-    def _determine_what_changed(self, patches):
+    def _determine_what_changed(self, patches, parent_patch_name):
         added = set()
         updated = set()
         skipped = set()
@@ -640,12 +640,20 @@ class PatchRepo(git.Repo):
             else:
                 added.add(patch_name)
 
+        # Skip all patches up to parent_patch_name
+        if parent_patch_name:
+            patch_names = self._non_recursive_series(self.series_path)
+            for patch_name in patch_names:
+                skipped.add(patch_name)
+                if patch_name == parent_patch_name:
+                    break
+
         series = set(self.series)
         removed = series - added - updated - skipped
 
         return added, updated, skipped, removed
 
-    def sync_patches(self, patches, parent_patch_name=None):
+    def sync_patches(self, patches, parent_patch_name):
         """Sync patches into working repo, adding, updating, and removing
         patches as necessary.
 
@@ -659,7 +667,7 @@ class PatchRepo(git.Repo):
         be inserted at the beginning of the series file.
         """
         added, updated, skipped, removed = self._determine_what_changed(
-                patches)
+                patches, parent_patch_name)
 
         source_paths = {}
         dest_paths = {}
@@ -669,7 +677,8 @@ class PatchRepo(git.Repo):
 
         # Toss the skipped patches
         for patch_name in skipped:
-            os.unlink(source_paths[patch_name])
+            if patch_name in source_paths:
+                os.unlink(source_paths[patch_name])
 
         # Move the added and updated patches
         for patch_name in added | updated:
@@ -689,6 +698,9 @@ class PatchRepo(git.Repo):
 
         # Update series file
         with self._mutate_series_file() as entries:
+            for patch_name in removed:
+                entries.remove(patch_name)
+
             if parent_patch_name:
                 base = entries.index(parent_patch_name) + 1
             else:
@@ -701,9 +713,6 @@ class PatchRepo(git.Repo):
                     entries.remove(patch_name)
 
                 entries.insert(base + idx, patch_name)
-
-            for patch_name in removed:
-                entries.remove(patch_name)
 
         return added, updated, skipped, removed
 
