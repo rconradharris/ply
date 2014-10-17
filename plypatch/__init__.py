@@ -19,6 +19,8 @@ RE_PATCH_IDENTIFIER = re.compile('Ply-Patch: (.*)')
 
 
 class Repo(git.Repo):
+    NON_INTERACTIVE = False
+
     def _add_annotation(self, prefix, value):
         """Add annotation to the last commit."""
         commit_msg = self.log(count=1, pretty='%B')
@@ -292,7 +294,7 @@ class WorkingRepo(Repo):
             raise exc.GitConfigRequired('user.name')
 
     def restore(self, three_way_merge=True, commit_msg=None,
-                fetch_remotes=True, custom_commit_msg=False):
+                fetch_remotes=True, customize_commit_msg=False):
         """Applies a series of patches to the working repo's current
         branch.
         """
@@ -378,16 +380,36 @@ class WorkingRepo(Repo):
             return
         based_on = self._last_upstream_commit_hash()
 
+        template = None
+
+        # Determine whether we need to prompt the user to edit commit message
         if commit_msg:
-            msgs = [commit_msg]
+            if customize_commit_msg:
+                msgs = []
+
+                # Use template so user can edit
+                with tempfile.NamedTemporaryFile(delete=False) as templ:
+                    templ.write(commit_msg)
+
+                template = templ.name
+            else:
+                # Use commit message as-is
+                msgs = [commit_msg]
         else:
-            if custom_commit_msg:
+            if customize_commit_msg:
+                # Require user edit commit message
                 msgs = []
             else:
+                # Use this default commit message without editing
                 msgs = ['Refreshing patches: %d updated, %d removed' % (
                         updated, removed)]
 
-        self.patch_repo.commit(msgs=msgs)
+        try:
+            self.patch_repo.commit(msgs=msgs, template=template)
+        finally:
+            if template:
+                os.unlink(template)
+
         self.patch_repo._add_annotation('Ply-Based-On', based_on)
 
     def rollback(self, lose_uncommitted=False):
@@ -445,7 +467,7 @@ class WorkingRepo(Repo):
 
         return source_paths, parent_patch_name
 
-    def save(self, since=None, custom_commit_msg=False):
+    def save(self, since=None):
         """Save a series of commits as patches into the patch-repo."""
         if self.uncommitted_changes() or self.patch_repo.uncommitted_changes():
             raise exc.UncommittedChanges
@@ -469,17 +491,14 @@ class WorkingRepo(Repo):
         num_patches = len(self.patch_repo.series)
         self.reset('HEAD~%d' % num_patches, hard=True)
 
-        if custom_commit_msg:
-            commit_msg = None
-        else:
-            commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
-                len(added), len(updated), len(removed))
+        commit_msg = "Saving patches: added %d, updated %d, removed %d" % (
+            len(added), len(updated), len(removed))
 
         # We have to commit to the patch-repo AFTER rolling-back and
         # reapplying so that we have the patch-annotations necessary to figure
         # out the correct Ply-Based-On annotation in the patch-repo.
         self.restore(commit_msg=commit_msg, fetch_remotes=False,
-                     custom_commit_msg=custom_commit_msg)
+                     customize_commit_msg=not self.NON_INTERACTIVE)
 
     @property
     def status(self):

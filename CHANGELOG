@@ -1,7 +1,9 @@
 0.4.0
 =====
 
-- ADDED: -m, --message options to `ply save` and `ply restore`
+- ADDED: `ply save` now prompts user to edit commit message
+
+- ADDED: -m, --message options to `ply restore`
 
 - REMOVED: -p, --prefix option from `ply save`
 

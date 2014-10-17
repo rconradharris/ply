@@ -95,7 +95,7 @@ class Repo(object):
 
     @cmd
     def commit(self, msgs=None, all=False, amend=False,
-               use_commit_object=None, quiet=None):
+               use_commit_object=None, quiet=None, template=None):
         if msgs is None:
             msgs = []
 
@@ -118,6 +118,9 @@ class Repo(object):
 
         if quiet:
             args.append('-q')
+
+        if template:
+            args.extend(['-t', template])
 
         subprocess.check_call(args)
 

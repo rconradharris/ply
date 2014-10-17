@@ -167,7 +167,7 @@ class RestoreCommand(CLICommand):
         """Apply the patch series to the the current branch of the
         working-repo"""
         try:
-            self.working_repo.restore(custom_commit_msg=args.message)
+            self.working_repo.restore(customize_commit_msg=args.message)
         except plypatch.exc.GitConfigRequired as e:
             die("Required git config '%s' is unset." % e)
         except plypatch.exc.RestoreInProgress:
@@ -196,13 +196,11 @@ class SaveCommand(CLICommand):
 
     def add_arguments(self, subparser):
         subparser.add_argument('-s', '--since')
-        subparser.add_argument('-m', '--message', action='store_true',
-                               help='Prompt for a custom commit message')
 
     def do(self, args):
         """Save set of commits to patch-repo"""
         try:
-            self.working_repo.save(args.since, custom_commit_msg=args.message)
+            self.working_repo.save(args.since)
         except plypatch.exc.NoPatchesApplied:
             die('No patches applied, so cannot detect new patches to save')
         except plypatch.exc.UncommittedChanges:

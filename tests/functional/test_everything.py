@@ -43,6 +43,7 @@ class FunctionalTestCase(unittest.TestCase):
         patch_repo = plypatch.PatchRepo(
                 path, quiet=self.QUIET,
                 supress_warnings=self.SUPRESS_WARNINGS)
+        patch_repo.NON_INTERACTIVE = True
         patch_repo.initialize()
         return patch_repo
 
@@ -51,6 +52,7 @@ class FunctionalTestCase(unittest.TestCase):
         working_repo = plypatch.WorkingRepo(
                 path, quiet=self.QUIET,
                 supress_warnings=self.SUPRESS_WARNINGS)
+        working_repo.NON_INTERACTIVE = True
         working_repo.init('.')
         working_repo.link(self.patch_repo_path)
         return working_repo
