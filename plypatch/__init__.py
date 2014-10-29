@@ -240,7 +240,8 @@ class WorkingRepo(Repo):
         if len(source_paths) > 1:
             raise Exception("Too many patches generated")
 
-        self.patch_repo.sync_patches(source_paths, parent_patch_name)
+        self.patch_repo.sync_patches(source_paths, parent_patch_name,
+                                     last_patch_name=patch_name)
 
         self._add_patch_annotation(patch_name)
         self.restore(fetch_remotes=False)  # Apply remaining patches
@@ -570,7 +571,8 @@ class PatchRepo(Repo):
 
         self.add('series')
 
-    def _determine_what_changed(self, source_paths, parent_patch_name):
+    def _determine_what_changed(self, source_paths, parent_patch_name,
+                                last_patch_name=None):
         added = set()
         updated = set()
         skipped = set()
@@ -589,20 +591,31 @@ class PatchRepo(Repo):
             else:
                 added.add(patch_name)
 
-        # Skip all patches up to parent_patch_name
-        if parent_patch_name:
-            patch_names = self._non_recursive_series(self.series_path)
-            for patch_name in patch_names:
-                skipped.add(patch_name)
+        skip_before = True
+        skip_after = False
+        patch_names = self._non_recursive_series(self.series_path)
+        for patch_name in patch_names:
+            # Skip all patches UP TO AND INCLUDING parent_patch_name
+            if parent_patch_name:
+                if skip_before:
+                    skipped.add(patch_name)
                 if patch_name == parent_patch_name:
-                    break
+                    skip_before = False
+
+            # Skip all patches AFTER BUT NOT INCLUDING last_patch_name
+            if last_patch_name:
+                if skip_after:
+                    skipped.add(patch_name)
+                if patch_name == last_patch_name:
+                    skip_after = True
 
         series = set(self.series)
         removed = series - added - updated - skipped
 
         return added, updated, skipped, removed
 
-    def sync_patches(self, source_paths, parent_patch_name):
+    def sync_patches(self, source_paths, parent_patch_name,
+                     last_patch_name=None):
         """Sync patches into working repo, adding, updating, and removing
         patches as necessary.
 
@@ -612,11 +625,15 @@ class PatchRepo(Repo):
         `parent_patch_name` represents where in the `series` file we should
         insert the new patch set.
 
+        `last_patch_name` represents the last patch we've seen. This is used
+        in during a resolve to so that we don't delete patches that we haven't
+        seen yet.
+
         `None` indicates that the patch-set doesn't have a parent so it should
         be inserted at the beginning of the series file.
         """
         added, updated, skipped, removed = self._determine_what_changed(
-            source_paths, parent_patch_name)
+            source_paths, parent_patch_name, last_patch_name=last_patch_name)
 
         source_lookup = {}
         dest_lookup = {}
