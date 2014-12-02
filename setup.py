@@ -1,7 +1,6 @@
 import setuptools
 
-
-execfile('plypatch/version.py')
+from plypatch.version import __version__
 
 
 setuptools.setup(
