@@ -79,7 +79,7 @@ class CheckCommand(CLICommand):
     __command__ = 'check'
 
     def do(self, args):
-        """Peform a health check on the patch-repo"""
+        """Perform a health check on the patch-repo"""
         try:
             status, errors = self.working_repo.check_patch_repo()
         except plypatch.exc.NoLinkedPatchRepo:
